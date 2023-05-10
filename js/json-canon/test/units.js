@@ -140,7 +140,7 @@ test('object with more than one property', (t) => {
 
 test('undefined', (t) => {
   const input = undefined
-  const expected = undefined
+  const expected = 'null'
   const actual = jsonCanon(input)
   t.is(actual, expected)
 })
@@ -154,7 +154,7 @@ test('null', (t) => {
 
 test('symbol', (t) => {
   const input = Symbol('hello world')
-  const expected = undefined
+  const expected = 'null'
   const actual = jsonCanon(input)
   t.is(actual, expected)
 })

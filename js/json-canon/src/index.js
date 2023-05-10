@@ -41,7 +41,7 @@ function serialize(value) {
 }
 
 function serializeUndefined() {
-  return undefined
+  return 'null'
 }
 
 function serializeBoolean(bool) {
@@ -87,11 +87,7 @@ function serializeArray(arr) {
   for (let i = 0; i < length; i++) {
     const val = arr[i]
     if (i !== 0) str += ','
-    if (val === undefined || typeof val === 'symbol') {
-      str += 'null'
-    } else {
-      str += serialize(val)
-    }
+    str += serialize(val)
   }
   return str + ']'
 }
