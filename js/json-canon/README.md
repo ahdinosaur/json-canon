@@ -26,11 +26,11 @@ See [`./examples/basic.js`](./examples/basic.js)
 
 ## Usage
 
+### `serialize = require('json-canon')`
+
 ```ts
 function serialize(input: unknown): string;
 ```
-
-### `canon = require('json-canon')`
 
 ## Bench
 
