@@ -9,7 +9,7 @@ npm install json-canon
 ## Example
 
 ```js
-const canon = require('json-canon')
+const serialize = require('json-canon')
 
 const json = {
   from_account: "543 232 625-3",
@@ -17,16 +17,16 @@ const json = {
   amount: 500,
   currency: "USD"
 }
-console.log(canon(json))
+console.log(serialize(json))
 // {"amount":500,"currency":"USD","from_account":"543 232 625-3","to_account":"321 567 636-4"}
 ```
 
 ## Usage
 
 ```ts
-type 
-
+function serialize(input: unknown): string;
 ```
+
 ### `canon = require('json-canon')`
 
 ## Bench
@@ -45,3 +45,24 @@ canonicalize x 28,365 ops/sec ±0.79% (93 runs sampled)
 json-canonicalize x 30,372 ops/sec ±0.56% (89 runs sampled)
 The fastest is JSON.stringify
 ```
+
+## License
+
+Copyright 2023 Michael Williams
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+## Related
+
+- [`canonicalize`](https://github.com/erdtman/canonicalize)
+- [`json-canonicalize`](https://github.com/snowyu/json-canonicalize.ts)

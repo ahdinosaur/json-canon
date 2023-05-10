@@ -24,7 +24,17 @@
     "signable",
     "signing"
   ],
-  "author": "Michael Williams",
+  "author": "Michael Williams <hello@mikey.nz>",
+  "contributors": [
+    {
+      "name": "Samuel Erdtman",
+      "email": "samuel@erdtman.se"
+    },
+    {
+      "name": "Anders Rundgren",
+      "email": "anders.rundgren.net@gmail.com"
+    }
+  ],
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/ahdinosaur/json-canon/issues"
