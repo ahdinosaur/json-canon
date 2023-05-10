@@ -1,6 +1,6 @@
 {
   "name": "json-canon",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Serialize JSON into a canonical format.",
   "main": "src/index.js",
   "scripts": {
