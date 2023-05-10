@@ -1,0 +1,19 @@
+{
+  "name": "json-canon-project",
+  "scripts": {
+    "test": "npm run test --workspaces",
+    "bench": "npm run bench --workspaces",
+    "format": "prettier --write \"./js/*/(src|test|bench)/**/*.js\"",
+    "format-staged": "pretty-quick --staged -pattern \"./js/*/(src|test|bench)/**/*.js\"",
+    "generate-test-nums": "node jcs-test-data/numgen"
+  },
+  "workspaces": [
+    "./js/*"
+  ],
+  "devDependencies": {
+    "ava": "^5.2.0",
+    "husky": "^8.0.3",
+    "pretty": "^2.0.0",
+    "pretty-quick": "^3.1.3"
+  }
+}

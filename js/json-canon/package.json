@@ -1,0 +1,47 @@
+{
+  "name": "json-canon",
+  "version": "0.0.0",
+  "description": "Serialize JSON into a canonical format.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "ava",
+    "bench": "node bench"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ahdinosaur/json-canon.git"
+  },
+  "keywords": [
+    "json",
+    "jcs",
+    "rfc8785",
+    "canon",
+    "canonical",
+    "canonicalize",
+    "crypto",
+    "hashable",
+    "hashing",
+    "signable",
+    "signing"
+  ],
+  "author": "Michael Williams",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/ahdinosaur/json-canon/issues"
+  },
+  "homepage": "https://github.com/ahdinosaur/json-canon#readme",
+  "devDependencies": {
+    "benchmark": "^2.1.4",
+    "canonicalize": "^2.0.0",
+    "fast-json-stable-stringify": "latest",
+    "fast-safe-stringify": "latest",
+    "fast-stable-stringify": "latest",
+    "faster-stable-stringify": "latest",
+    "fastest-stable-stringify": "latest",
+    "json-canonicalize": "^1.0.5",
+    "json-stable-stringify": "latest",
+    "json-stringify-deterministic": "latest",
+    "json-stringify-safe": "latest",
+    "safe-stable-stringify": "latest"
+  }
+}
