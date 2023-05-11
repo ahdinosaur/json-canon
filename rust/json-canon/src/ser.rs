@@ -9,6 +9,7 @@ use serde_json::{
 use std::{
     collections::VecDeque,
     io::{self, Error, ErrorKind, Write},
+    str::from_utf8_unchecked,
 };
 
 /// Serialize the given value as a String of JSON.
@@ -86,17 +87,24 @@ impl ObjectEntry {
         }
     }
 
-    fn push_orig(&mut self, bytes: &[u8]) {
-        if !self.is_key_done {
-            self.key_orig.extend_from_slice(bytes);
+    fn cmpable<'a>(&'a self) -> impl Iterator<Item = impl Ord + 'a> {
+        let key_orig = unsafe { from_utf8_unchecked(self.key_orig.as_slice()) };
+        key_orig.encode_utf16()
+    }
+
+    fn get_writer_orig<'a>(&'a mut self) -> Box<dyn Write + 'a> {
+        if self.is_key_done {
+            Box::new(io::sink())
+        } else {
+            Box::new(&mut self.key_orig)
         }
     }
 
-    fn push_ser(&mut self, bytes: &[u8]) {
+    fn get_writer_ser<'a>(&'a mut self) -> Box<dyn Write + 'a> {
         if self.is_key_done {
-            self.value_ser.extend_from_slice(bytes);
+            Box::new(&mut self.value_ser)
         } else {
-            self.key_ser.extend_from_slice(bytes);
+            Box::new(&mut self.key_ser)
         }
     }
 
@@ -104,7 +112,7 @@ impl ObjectEntry {
         if self.is_key_done {
             Box::new(&mut self.value_ser)
         } else {
-            Box::new(&mut self.key_ser)
+            Box::new(CombinedWriter::new(&mut self.key_orig, &mut self.key_ser))
         }
     }
 
@@ -116,13 +124,13 @@ impl ObjectEntry {
     where
         W: Write + ?Sized,
     {
-        if !first {
-            writer.write_all(",".as_bytes())?;
-        }
-
+        CompactFormatter.begin_object_key(writer, first)?;
         writer.write_all(self.key_ser.as_slice())?;
-        writer.write_all(":".as_bytes())?;
+        CompactFormatter.end_object_key(writer)?;
+
+        CompactFormatter.begin_object_value(writer)?;
         writer.write_all(self.value_ser.as_slice())?;
+        CompactFormatter.end_object_value(writer)?;
 
         Ok(())
     }
@@ -191,25 +199,34 @@ impl Object {
         Ok(self.current_entry()?.end_key())
     }
 
-    fn push_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current_entry()?.push_orig(bytes))
+    fn get_writer_orig<'a>(&'a mut self) -> io::Result<Box<dyn Write + 'a>> {
+        Ok(self.current_entry()?.get_writer_orig())
     }
 
-    fn push_ser(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current_entry()?.push_ser(bytes))
+    fn get_writer_ser<'a>(&'a mut self) -> io::Result<Box<dyn Write + 'a>> {
+        Ok(self.current_entry()?.get_writer_ser())
     }
 
-    fn get_writer(&mut self) -> io::Result<Box<dyn Write>> {
+    fn get_writer<'a>(&'a mut self) -> io::Result<Box<dyn Write + 'a>> {
         Ok(self.current_entry()?.get_writer())
     }
 
-    fn write_out<W>(&self, writer: &mut W) -> io::Result<()>
+    fn write_out<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: Write + ?Sized,
     {
         CompactFormatter.begin_object(writer)?;
 
-        // ...
+        let mut entries = self.entries.clone();
+
+        entries.sort_by(|a, b| a.cmpable().cmp(b.cmpable()));
+
+        let mut first = true;
+        for entry in entries {
+            entry.write_out(first, writer)?;
+
+            first = false;
+        }
 
         CompactFormatter.end_object(writer)?;
 
@@ -251,23 +268,36 @@ impl ObjectStack {
     }
 
     fn end_key(&mut self) -> io::Result<()> {
-        Ok(self.current_object()?.start_key())
+        Ok(self.current_object()?.end_key()?)
     }
 
-    fn push_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current_object()?.push_orig(bytes)?)
+    fn get_writer_orig<'a>(&'a mut self) -> io::Result<Box<dyn Write + 'a>> {
+        let writer = if self.has_current_object() {
+            self.current_object()?.get_writer_orig()?
+        } else {
+            Box::new(io::sink())
+        };
+        Ok(writer)
     }
 
-    fn push_ser(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current_object()?.push_ser(bytes)?)
-    }
-
-    fn get_writer<W>(&mut self, writer: &mut W) -> io::Result<Box<dyn Write>>
+    fn get_writer_ser<'a, W>(&'a mut self, writer: &'a mut W) -> io::Result<Box<dyn Write + 'a>>
     where
         W: Write + ?Sized,
     {
-        let mut writer = if self.has_current_object() {
-            self.current_object()?.current_entry()?.get_writer()
+        let writer = if self.has_current_object() {
+            self.current_object()?.get_writer_ser()?
+        } else {
+            Box::new(writer)
+        };
+        Ok(writer)
+    }
+
+    fn get_writer<'a, W>(&'a mut self, writer: &'a mut W) -> io::Result<Box<dyn Write + 'a>>
+    where
+        W: Write + ?Sized,
+    {
+        let writer = if self.has_current_object() {
+            self.current_object()?.get_writer()?
         } else {
             Box::new(writer)
         };
@@ -297,7 +327,7 @@ pub struct CanonicalFormatter {
 }
 
 impl CanonicalFormatter {
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             stack: ObjectStack::new(),
         }
@@ -310,7 +340,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        Ok(self.stack.push_ser(b"null")?)
+        Ok(self.stack.get_writer(writer)?.write_all(b"null")?)
     }
 
     #[inline]
@@ -319,9 +349,9 @@ impl Formatter for CanonicalFormatter {
         W: Write + ?Sized,
     {
         if value {
-            Ok(self.stack.push_ser(b"true")?)
+            Ok(self.stack.get_writer(writer)?.write_all(b"true")?)
         } else {
-            Ok(self.stack.push_ser(b"false")?)
+            Ok(self.stack.get_writer(writer)?.write_all(b"false")?)
         }
     }
 
@@ -334,41 +364,61 @@ impl Formatter for CanonicalFormatter {
 
         match escape {
             CharEscape::Backspace => {
-                self.stack.push_orig(&[0x0, 0x0, 0x0, 0x8])?;
-                self.stack.push_ser(b"\\b")?;
+                self.stack
+                    .get_writer_orig()?
+                    .write_all(&[0x0, 0x0, 0x0, 0x8])?;
+                self.stack.get_writer_ser(writer)?.write_all(b"\\b")?;
             }
             CharEscape::Tab => {
-                self.stack.push_orig(&[0x0, 0x0, 0x0, 0x9])?;
-                self.stack.push_ser(b"\\t")?;
+                self.stack
+                    .get_writer_orig()?
+                    .write_all(&[0x0, 0x0, 0x0, 0x9])?;
+                self.stack.get_writer_ser(writer)?.write_all(b"\\t")?;
             }
             CharEscape::LineFeed => {
-                self.stack.push_orig(&[0x0, 0x0, 0x0, 0xA])?;
-                self.stack.push_ser(b"\\n")?;
+                self.stack
+                    .get_writer_orig()?
+                    .write_all(&[0x0, 0x0, 0x0, 0xA])?;
+                self.stack.get_writer_ser(writer)?.write_all(b"\\n")?;
             }
             CharEscape::FormFeed => {
-                self.stack.push_orig(&[0x0, 0x0, 0x0, 0xC])?;
-                self.stack.push_ser(b"\\f")?;
+                self.stack
+                    .get_writer_orig()?
+                    .write_all(&[0x0, 0x0, 0x0, 0xC])?;
+                self.stack.get_writer_ser(writer)?.write_all(b"\\f")?;
             }
             CharEscape::CarriageReturn => {
-                self.stack.push_orig(&[0x0, 0x0, 0x0, 0xD])?;
-                self.stack.push_ser(b"\\r")?;
+                self.stack
+                    .get_writer_orig()?
+                    .write_all(&[0x0, 0x0, 0x0, 0xD])?;
+                self.stack.get_writer_ser(writer)?.write_all(b"\\r")?;
             }
             CharEscape::Quote => {
-                self.stack.push_orig(&[0x0, 0x0, 0x2, 0x2])?;
-                self.stack.push_ser(b"\\\"")?;
+                self.stack
+                    .get_writer_orig()?
+                    .write_all(&[0x0, 0x0, 0x2, 0x2])?;
+                self.stack.get_writer_ser(writer)?.write_all(b"\\\"")?;
             }
             CharEscape::ReverseSolidus => {
-                self.stack.push_orig(&[0x0, 0x0, 0x5, 0xC])?;
-                self.stack.push_ser(b"\\\\")?;
+                self.stack
+                    .get_writer_orig()?
+                    .write_all(&[0x0, 0x0, 0x5, 0xC])?;
+                self.stack.get_writer_ser(writer)?.write_all(b"\\\\")?;
             }
             CharEscape::Solidus => {
-                self.stack.push_orig(&[0x0, 0x0, 0x2, 0xF])?;
-                self.stack.push_ser(b"\\/")?;
+                self.stack
+                    .get_writer_orig()?
+                    .write_all(&[0x0, 0x0, 0x2, 0xF])?;
+                self.stack.get_writer_ser(writer)?.write_all(b"\\/")?;
             }
             CharEscape::AsciiControl(control) => {
-                self.stack
-                    .push_orig(&[0x0, 0x0, (control >> 4), (control & 0xF)])?;
-                self.stack.push_ser(&[
+                self.stack.get_writer_orig()?.write_all(&[
+                    0x0,
+                    0x0,
+                    (control >> 4),
+                    (control & 0xF),
+                ])?;
+                self.stack.get_writer_ser(writer)?.write_all(&[
                     b'\\',
                     b'u',
                     b'0',
@@ -397,8 +447,7 @@ impl Formatter for CanonicalFormatter {
     {
         // TOOD: Check
         let bytes = fragment.as_bytes();
-        self.stack.push_orig(&bytes)?;
-        self.stack.push_ser(&bytes)?;
+        self.stack.get_writer(writer)?.write_all(&bytes)?;
         Ok(())
     }
 
@@ -545,7 +594,7 @@ impl Formatter for CanonicalFormatter {
     }
 
     #[inline]
-    fn begin_object<W>(&mut self, writer: &mut W) -> io::Result<()>
+    fn begin_object<W>(&mut self, _writer: &mut W) -> io::Result<()>
     where
         W: Write + ?Sized,
     {
