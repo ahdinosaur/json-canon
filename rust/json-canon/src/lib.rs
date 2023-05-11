@@ -11,9 +11,11 @@
 //! ## Example
 //!
 //! ```rust
-//! # use json_canon::to_string;
-//! # use serde_json::{json, Error};
+//! use json_canon::to_string;
+//! use serde_json::json;
+//! # use serde_json::Error;
 //! # fn main() -> Result<(), Error> {
+//!
 //! let data = json!({
 //!     "from_account": "543 232 625-3",
 //!     "to_account": "321 567 636-4",
