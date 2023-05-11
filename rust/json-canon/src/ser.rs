@@ -1,4 +1,3 @@
-use core::mem::replace;
 use core::num::FpCategory;
 use serde::Serialize;
 use serde_json::{
@@ -7,7 +6,10 @@ use serde_json::{
     Result, Serializer, Value,
 };
 
-use std::{io::{self, Error, ErrorKind, Write}, collections::VecDeque};
+use std::{
+    collections::VecDeque,
+    io::{self, Error, ErrorKind, Write},
+};
 
 /// Serialize the given value as a String of JSON.
 ///
@@ -71,7 +73,7 @@ struct ObjectEntry {
     key_orig: Vec<u8>,
     key_ser: Vec<u8>,
     value_ser: Vec<u8>,
-    is_key_done: bool
+    is_key_done: bool,
 }
 
 impl ObjectEntry {
@@ -98,11 +100,11 @@ impl ObjectEntry {
         }
     }
 
-    fn get_writer(&mut self) -> Box<dyn Write> {
+    fn get_writer<'a>(&'a mut self) -> Box<dyn Write + 'a> {
         if self.is_key_done {
-            Box::new(self.value_ser)
+            Box::new(&mut self.value_ser)
         } else {
-            Box::new(self.key_ser)
+            Box::new(&mut self.key_ser)
         }
     }
 
@@ -126,19 +128,58 @@ impl ObjectEntry {
     }
 }
 
+struct CombinedWriter<'a> {
+    a: Box<dyn Write + 'a>,
+    b: Box<dyn Write + 'a>,
+}
+
+impl<'a> CombinedWriter<'a> {
+    pub fn new<A, B>(a: &'a mut A, b: &'a mut B) -> Self
+    where
+        A: Write + ?Sized,
+        B: Write + ?Sized,
+    {
+        Self {
+            a: Box::new(a),
+            b: Box::new(b),
+        }
+    }
+}
+
+impl<'a> Write for CombinedWriter<'a> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.a.write(buf)?;
+        self.b.write(buf)?;
+        // uhhh
+        self.flush()?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.a.flush()?;
+        self.b.flush()?;
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug)]
-struct ObjectEntries {
+struct Object {
     entries: Vec<ObjectEntry>,
 }
 
-impl ObjectEntries {
+impl Object {
     fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
-    fn current(&mut self) -> io::Result<&mut ObjectEntry> {
+    fn current_entry(&mut self) -> io::Result<&mut ObjectEntry> {
         self.entries.last_mut().ok_or_else(|| {
-            Error::new(ErrorKind::InvalidData, "Object entry requested when entry is not active.")
+            Error::new(
+                ErrorKind::InvalidData,
+                "Object entry requested when entry is not active.",
+            )
         })
     }
 
@@ -147,15 +188,19 @@ impl ObjectEntries {
     }
 
     fn end_key(&mut self) -> io::Result<()> {
-        Ok(self.current()?.end_key())
+        Ok(self.current_entry()?.end_key())
     }
 
     fn push_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current()?.push_orig(bytes))
+        Ok(self.current_entry()?.push_orig(bytes))
     }
 
     fn push_ser(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current()?.push_ser(bytes))
+        Ok(self.current_entry()?.push_ser(bytes))
+    }
+
+    fn get_writer(&mut self) -> io::Result<Box<dyn Write>> {
+        Ok(self.current_entry()?.get_writer())
     }
 
     fn write_out<W>(&self, writer: &mut W) -> io::Result<()>
@@ -174,61 +219,73 @@ impl ObjectEntries {
 
 #[derive(Clone, Debug)]
 struct ObjectStack {
-    stack: VecDeque<ObjectEntries>,
+    objects: VecDeque<Object>,
 }
 
 impl ObjectStack {
     fn new() -> Self {
-        Self { stack: VecDeque::new() }
+        Self {
+            objects: VecDeque::new(),
+        }
     }
 
-    fn current(&mut self) -> io::Result<&mut ObjectEntries> {
-        self.stack
-            .front_mut()
-            .ok_or_else(|| {
-                Error::new(ErrorKind::InvalidData, "Object requested when object is not active.")
-            })
+    fn current_object(&mut self) -> io::Result<&mut Object> {
+        self.objects.front_mut().ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidData,
+                "Object requested when object is not active.",
+            )
+        })
     }
-    
-    fn has_current(&mut self) -> bool {
-        !self.stack.is_empty()
+
+    fn has_current_object(&mut self) -> bool {
+        !self.objects.is_empty()
     }
 
     fn start_object(&mut self) {
-        self.stack.push_front(ObjectEntries::new())
+        self.objects.push_front(Object::new())
     }
 
     fn start_key(&mut self) -> io::Result<()> {
-        Ok(self.current()?.start_key())
+        Ok(self.current_object()?.start_key())
     }
 
     fn end_key(&mut self) -> io::Result<()> {
-        Ok(self.current()?.start_key())
+        Ok(self.current_object()?.start_key())
     }
 
     fn push_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current()?.push_orig(bytes)?)
+        Ok(self.current_object()?.push_orig(bytes)?)
     }
 
     fn push_ser(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current()?.push_ser(bytes)?)
+        Ok(self.current_object()?.push_ser(bytes)?)
     }
 
+    fn get_writer<W>(&mut self, writer: &mut W) -> io::Result<Box<dyn Write>>
+    where
+        W: Write + ?Sized,
+    {
+        let mut writer = if self.has_current_object() {
+            self.current_object()?.current_entry()?.get_writer()
+        } else {
+            Box::new(writer)
+        };
+        Ok(writer)
+    }
 
     fn end_object<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: Write + ?Sized,
     {
-        let mut object = self.stack.pop_front().ok_or_else(|| {
-            Error::new(ErrorKind::InvalidData, "Object requested when object is not active.")
+        let mut object = self.objects.pop_front().ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidData,
+                "Object requested when object is not active.",
+            )
         })?;
 
-        let mut writer = if self.has_current() {
-            self.current()?.current()?.get_writer()
-        } else {
-            Box::new(writer)
-        };
-
+        let mut writer = self.get_writer(writer)?;
         object.write_out(&mut writer)
     }
 }
@@ -241,7 +298,9 @@ pub struct CanonicalFormatter {
 
 impl CanonicalFormatter {
     pub const fn new() -> Self {
-        Self { stack: ObjectStack::new() }
+        Self {
+            stack: ObjectStack::new(),
+        }
     }
 }
 
@@ -251,7 +310,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        self.scope(writer).write_all(b"null")
+        Ok(self.stack.push_ser(b"null")?)
     }
 
     #[inline]
@@ -260,40 +319,66 @@ impl Formatter for CanonicalFormatter {
         W: Write + ?Sized,
     {
         if value {
-            self.scope(writer).write_all(b"true")
+            Ok(self.stack.push_ser(b"true")?)
         } else {
-            self.scope(writer).write_all(b"false")
+            Ok(self.stack.push_ser(b"false")?)
         }
     }
 
+    #[inline]
     fn write_char_escape<W>(&mut self, writer: &mut W, escape: CharEscape) -> io::Result<()>
     where
         W: Write + ?Sized,
     {
-        static HEX: [u8; 16] = *b"0123456789abcdef";
+        static HEX_CHARS: [u8; 16] = *b"0123456789abcdef";
 
-        let serialized_bytes = match escape {
-            CharEscape::Quote => b"\\\"".to_vec(),
-            CharEscape::ReverseSolidus => b"\\\\".to_vec(),
-            CharEscape::Solidus => b"\\/".to_vec(),
-            CharEscape::Backspace => b"\\b".to_vec(),
-            CharEscape::FormFeed => b"\\f".to_vec(),
-            CharEscape::LineFeed => b"\\n".to_vec(),
-            CharEscape::CarriageReturn => b"\\r".to_vec(),
-            CharEscape::Tab => b"\\t".to_vec(),
+        match escape {
+            CharEscape::Backspace => {
+                self.stack.push_orig(&[0x0, 0x0, 0x0, 0x8])?;
+                self.stack.push_ser(b"\\b")?;
+            }
+            CharEscape::Tab => {
+                self.stack.push_orig(&[0x0, 0x0, 0x0, 0x9])?;
+                self.stack.push_ser(b"\\t")?;
+            }
+            CharEscape::LineFeed => {
+                self.stack.push_orig(&[0x0, 0x0, 0x0, 0xA])?;
+                self.stack.push_ser(b"\\n")?;
+            }
+            CharEscape::FormFeed => {
+                self.stack.push_orig(&[0x0, 0x0, 0x0, 0xC])?;
+                self.stack.push_ser(b"\\f")?;
+            }
+            CharEscape::CarriageReturn => {
+                self.stack.push_orig(&[0x0, 0x0, 0x0, 0xD])?;
+                self.stack.push_ser(b"\\r")?;
+            }
+            CharEscape::Quote => {
+                self.stack.push_orig(&[0x0, 0x0, 0x2, 0x2])?;
+                self.stack.push_ser(b"\\\"")?;
+            }
+            CharEscape::ReverseSolidus => {
+                self.stack.push_orig(&[0x0, 0x0, 0x5, 0xC])?;
+                self.stack.push_ser(b"\\\\")?;
+            }
+            CharEscape::Solidus => {
+                self.stack.push_orig(&[0x0, 0x0, 0x2, 0xF])?;
+                self.stack.push_ser(b"\\/")?;
+            }
             CharEscape::AsciiControl(control) => {
-                [
+                self.stack
+                    .push_orig(&[0x0, 0x0, (control >> 4), (control & 0xF)])?;
+                self.stack.push_ser(&[
                     b'\\',
                     b'u',
                     b'0',
                     b'0',
-                    HEX[(control >> 4) as usize],
-                    HEX[(control & 0xF) as usize],
-                ].to_vec()
+                    HEX_CHARS[(control >> 4) as usize],
+                    HEX_CHARS[(control & 0xF) as usize],
+                ])?;
             }
         }
-
-        if 
+        Ok(())
     }
 
     #[inline]
@@ -304,13 +389,17 @@ impl Formatter for CanonicalFormatter {
         todo!("Handle number str (u128/i128)")
     }
 
+    // https://262.ecma-international.org/10.0/#sec-quotejsonstring
     #[inline]
     fn write_string_fragment<W>(&mut self, writer: &mut W, fragment: &str) -> io::Result<()>
     where
         W: Write + ?Sized,
     {
         // TOOD: Check
-        self.scope(writer).write_all(fragment.as_bytes())
+        let bytes = fragment.as_bytes();
+        self.stack.push_orig(&bytes)?;
+        self.stack.push_ser(&bytes)?;
+        Ok(())
     }
 
     #[inline]
@@ -321,7 +410,7 @@ impl Formatter for CanonicalFormatter {
         // TOOD: Check
         from_str::<Value>(fragment)?
             .serialize(&mut Serializer::with_formatter(
-                self.scope(writer),
+                self.stack.get_writer(writer)?,
                 Self::new(),
             ))
             .map_err(Into::into)
@@ -332,7 +421,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_i8(&mut self.scope(writer), value)
+        CompactFormatter.write_i8(&mut self.stack.get_writer(writer)?, value)
     }
 
     #[inline]
@@ -340,7 +429,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_i16(&mut self.scope(writer), value)
+        CompactFormatter.write_i16(&mut self.stack.get_writer(writer)?, value)
     }
 
     #[inline]
@@ -348,7 +437,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_i32(&mut self.scope(writer), value)
+        CompactFormatter.write_i32(&mut self.stack.get_writer(writer)?, value)
     }
 
     #[inline]
@@ -356,7 +445,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_i64(&mut self.scope(writer), value)
+        CompactFormatter.write_i64(&mut self.stack.get_writer(writer)?, value)
     }
 
     #[inline]
@@ -364,7 +453,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_u8(&mut self.scope(writer), value)
+        CompactFormatter.write_u8(&mut self.stack.get_writer(writer)?, value)
     }
 
     #[inline]
@@ -372,7 +461,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_u16(&mut self.scope(writer), value)
+        CompactFormatter.write_u16(&mut self.stack.get_writer(writer)?, value)
     }
 
     #[inline]
@@ -380,7 +469,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_u32(&mut self.scope(writer), value)
+        CompactFormatter.write_u32(&mut self.stack.get_writer(writer)?, value)
     }
 
     #[inline]
@@ -388,7 +477,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_u64(&mut self.scope(writer), value)
+        CompactFormatter.write_u64(&mut self.stack.get_writer(writer)?, value)
     }
 
     #[inline]
@@ -396,7 +485,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        self.write_float(writer, value.classify(), value)
+        write_float(&mut self.stack.get_writer(writer)?, value.classify(), value)
     }
 
     #[inline]
@@ -404,7 +493,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        self.write_float(writer, value.classify(), value)
+        write_float(&mut self.stack.get_writer(writer)?, value.classify(), value)
     }
 
     #[inline]
@@ -412,7 +501,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.begin_string(&mut self.scope(writer))
+        CompactFormatter.begin_string(&mut self.stack.get_writer(writer)?)
     }
 
     #[inline]
@@ -420,7 +509,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.end_string(&mut self.scope(writer))
+        CompactFormatter.end_string(&mut self.stack.get_writer(writer)?)
     }
 
     #[inline]
@@ -428,7 +517,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.begin_array(&mut self.scope(writer))
+        CompactFormatter.begin_array(&mut self.stack.get_writer(writer)?)
     }
 
     #[inline]
@@ -436,7 +525,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.end_array(&mut self.scope(writer))
+        CompactFormatter.end_array(&mut self.stack.get_writer(writer)?)
     }
 
     #[inline]
@@ -444,7 +533,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.begin_array_value(&mut self.scope(writer), first)
+        CompactFormatter.begin_array_value(&mut self.stack.get_writer(writer)?, first)
     }
 
     #[inline]
@@ -452,7 +541,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.end_array_value(&mut self.scope(writer))
+        CompactFormatter.end_array_value(&mut self.stack.get_writer(writer)?)
     }
 
     #[inline]
@@ -460,10 +549,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.begin_object(&mut self.scope(writer))?;
-
-        self.0.push(Entry::new());
-
+        self.stack.start_object();
         Ok(())
     }
 
@@ -471,12 +557,15 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
+        self.stack.end_object(writer)
+
+        /*
         let entry: Entry = self
             .0
             .pop()
             .ok_or_else(|| Error::new(ErrorKind::Other, "oh no"))?;
 
-        let mut scope = self.scope(writer);
+        let mut scope = self.stack.get_writer(writer)?;
         let mut first = true;
 
         let mut keys: Vec<String> = entry
@@ -546,6 +635,7 @@ impl Formatter for CanonicalFormatter {
         }
 
         CompactFormatter.end_object(&mut scope)
+        */
     }
 
     #[inline]
@@ -553,9 +643,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        self.entry_mut().map(|entry| {
-            entry.complete = false;
-        })
+        self.stack.start_key()
     }
 
     #[inline]
@@ -563,9 +651,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        self.entry_mut().map(|entry| {
-            entry.complete = true;
-        })
+        self.stack.end_key()
     }
 
     #[inline]
@@ -580,22 +666,11 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        let entry: &mut Entry = self.entry_mut()?;
-
-        let key: Vec<u8> = replace(&mut entry.next_key, Vec::new());
-        let val: Vec<u8> = replace(&mut entry.next_val, Vec::new());
-
-        entry.object.insert(key, val);
-
         Ok(())
     }
 }
 
-fn write_float<W, F>(
-    writer: &mut W,
-    category: FpCategory,
-    value: F,
-) -> io::Result<()>
+fn write_float<W, F>(writer: &mut W, category: FpCategory, value: F) -> io::Result<()>
 where
     W: Write + ?Sized,
     F: ryu_js::Float,
@@ -607,6 +682,8 @@ where
             "Infinity is not allowed.",
         )),
         FpCategory::Zero => writer.write_all(b"0"),
-        FpCategory::Normal | FpCategory::Subnormal => writer.write_all(ryu_js::Buffer::new().format_finite(value).as_bytes()),
+        FpCategory::Normal | FpCategory::Subnormal => {
+            writer.write_all(ryu_js::Buffer::new().format_finite(value).as_bytes())
+        }
     }
 }
