@@ -1,10 +1,6 @@
-<h1 align="center">`json-canon`</h1>
+# `json-canon`
 
-<div align="center">
-  <strong>
-    Serialize JSON into a canonical format.
-  </strong>
-</div>
+Serialize JSON into a canonical format.
 
 Safe for generating a consistent cryptographic hash or signature across platforms.
 
