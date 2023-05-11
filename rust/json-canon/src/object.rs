@@ -1,6 +1,6 @@
 use std::{
     collections::VecDeque,
-    io::{self, Error, ErrorKind, Write},
+    io::{self, Error, ErrorKind, IoSlice, Write},
     str::from_utf8_unchecked,
 };
 
@@ -10,8 +10,37 @@ use serde_json::ser::{CompactFormatter, Formatter};
 pub(crate) struct ObjectEntry {
     key_orig: Vec<u8>,
     key_ser: Vec<u8>,
-    value_ser: Vec<u8>,
+    value_ser: VecBytes,
     is_key_done: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct VecBytes(Vec<Vec<u8>>);
+
+impl VecBytes {
+    fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    fn write_out<W>(&self, writer: &mut W) -> io::Result<()>
+    where
+        W: Write + ?Sized,
+    {
+        let mut vectored: Vec<IoSlice> = self.0.iter().map(|buf| IoSlice::new(&buf)).collect();
+        writer.write_all_vectored(&mut vectored)?;
+        Ok(())
+    }
+}
+
+impl Write for VecBytes {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.push(buf.to_vec());
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 impl ObjectEntry {
@@ -19,7 +48,7 @@ impl ObjectEntry {
         Self {
             key_orig: Vec::new(),
             key_ser: Vec::new(),
-            value_ser: Vec::new(),
+            value_ser: VecBytes::new(),
             is_key_done: false,
         }
     }
@@ -57,11 +86,12 @@ impl ObjectEntry {
     }
 
     pub(crate) fn to_ser_writer<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
-        if !self.is_key_done {
-            Ok(&mut self.key_ser)
+        let writer = if !self.is_key_done {
+            EitherWriter::Left(&mut self.key_ser)
         } else {
-            Ok(&mut self.value_ser)
-        }
+            EitherWriter::Right(&mut self.value_ser)
+        };
+        Ok(writer)
     }
 
     #[inline]
@@ -79,7 +109,7 @@ impl ObjectEntry {
         CompactFormatter.end_object_key(writer)?;
 
         CompactFormatter.begin_object_value(writer)?;
-        writer.write_all(self.value_ser.as_slice())?;
+        self.value_ser.write_out(writer)?;
         CompactFormatter.end_object_value(writer)?;
 
         Ok(())
@@ -256,37 +286,37 @@ impl ObjectStack {
     where
         W: Write + ?Sized,
     {
-        let writer: ObjectStackWriter<_, _> = if self.has_current_object() {
+        let writer: EitherWriter<_, _> = if self.has_current_object() {
             let object_writer = self.current_object()?.to_ser_writer()?;
-            ObjectStackWriter::Object(object_writer)
+            EitherWriter::Left(object_writer)
         } else {
-            ObjectStackWriter::Base(writer)
+            EitherWriter::Right(writer)
         };
         Ok(writer)
     }
 }
 
-enum ObjectStackWriter<ObjectWriter, BaseWriter> {
-    Object(ObjectWriter),
-    Base(BaseWriter),
+enum EitherWriter<LeftWriter, RightWriter> {
+    Left(LeftWriter),
+    Right(RightWriter),
 }
 
-impl<ObjectWriter, BaseWriter> Write for ObjectStackWriter<ObjectWriter, BaseWriter>
+impl<LeftWriter, RightWriter> Write for EitherWriter<LeftWriter, RightWriter>
 where
-    ObjectWriter: Write,
-    BaseWriter: Write,
+    LeftWriter: Write,
+    RightWriter: Write,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
-            ObjectStackWriter::Object(writer) => writer.write(buf),
-            ObjectStackWriter::Base(writer) => writer.write(buf),
+            EitherWriter::Left(writer) => writer.write(buf),
+            EitherWriter::Right(writer) => writer.write(buf),
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
         match self {
-            ObjectStackWriter::Object(writer) => writer.flush(),
-            ObjectStackWriter::Base(writer) => writer.flush(),
+            EitherWriter::Left(writer) => writer.flush(),
+            EitherWriter::Right(writer) => writer.flush(),
         }
     }
 }

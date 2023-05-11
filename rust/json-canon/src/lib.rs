@@ -1,3 +1,5 @@
+#![feature(write_all_vectored)]
+
 //! # `json-canon`
 //!
 //! Serialize JSON into a canonical format.
