@@ -4,7 +4,7 @@ const { readFileSync, readdirSync } = require('fs')
 
 const jsonCanon = require('../')
 
-const testDataBaseDir = join(__dirname, '../../../jcs-test-data')
+const testDataBaseDir = join(__dirname, '../../../test-data')
 const testDataInputDir = join(testDataBaseDir, 'input')
 const testDataOutputDir = join(testDataBaseDir, 'output')
 

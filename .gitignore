@@ -1,5 +1,4 @@
 node_modules
 npm-debug.log*
-test-nums*.txt
-test-json*.txt
+/test-data/generated
 /target

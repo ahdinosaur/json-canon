@@ -1,9 +1,8 @@
 use core::num::FpCategory;
 use serde::Serialize;
 use serde_json::{
-    from_str,
     ser::{CharEscape, CompactFormatter, Formatter},
-    Result, Serializer, Value,
+    Result, Serializer,
 };
 
 use std::io::{self, Error, ErrorKind, Write};
@@ -134,13 +133,13 @@ impl Formatter for CanonicalFormatter {
                 self.stack.write_orig(&[0x0, 0x0, 0x2, 0x2])?;
                 self.stack.write_ser(writer, b"\\\"")?;
             }
-            CharEscape::ReverseSolidus => {
-                self.stack.write_orig(&[0x0, 0x0, 0x5, 0xC])?;
-                self.stack.write_ser(writer, b"\\\\")?;
-            }
             CharEscape::Solidus => {
                 self.stack.write_orig(&[0x0, 0x0, 0x2, 0xF])?;
                 self.stack.write_ser(writer, b"\\/")?;
+            }
+            CharEscape::ReverseSolidus => {
+                self.stack.write_orig(&[0x0, 0x0, 0x5, 0xC])?;
+                self.stack.write_ser(writer, b"\\\\")?;
             }
             CharEscape::AsciiControl(control) => {
                 self.stack
@@ -175,9 +174,10 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
+        println!("{}", fragment);
         // TOOD: Check
         let bytes = fragment.as_bytes();
-        self.stack.write(writer, &bytes)?;
+        self.stack.write(writer, bytes)?;
         Ok(())
     }
 
@@ -186,13 +186,9 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        // TOOD: Check
-        from_str::<Value>(fragment)?
-            .serialize(&mut Serializer::with_formatter(
-                self.stack.to_ser_writer(writer)?,
-                Self::new(),
-            ))
-            .map_err(Into::into)
+        let bytes = fragment.as_bytes();
+        self.stack.write(writer, bytes)?;
+        Ok(())
     }
 
     #[inline]

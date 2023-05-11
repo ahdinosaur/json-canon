@@ -56,7 +56,7 @@ fn test_number_data() -> Result<(), io::Error> {
         assert_eq!(to_string(&f64::from_bits(bits)).unwrap(), expected);
     }
 
-    let test_data_path = current_dir()?.join(Path::new("../../jcs-test-data/test-nums-1m.txt"));
+    let test_data_path = current_dir()?.join(Path::new("../../test-data/generated/numbers.txt"));
 
     let file = File::open(test_data_path)?;
     let reader = BufReader::new(file);

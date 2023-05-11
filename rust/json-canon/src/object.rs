@@ -256,37 +256,37 @@ impl ObjectStack {
     where
         W: Write + ?Sized,
     {
-        let writer: ObjectStackWriter<_, _> = if self.has_current_object() {
+        let writer: EitherWriter<_, _> = if self.has_current_object() {
             let object_writer = self.current_object()?.to_ser_writer()?;
-            ObjectStackWriter::Object(object_writer)
+            EitherWriter::Left(object_writer)
         } else {
-            ObjectStackWriter::Base(writer)
+            EitherWriter::Right(writer)
         };
         Ok(writer)
     }
 }
 
-enum ObjectStackWriter<ObjectWriter, BaseWriter> {
-    Object(ObjectWriter),
-    Base(BaseWriter),
+enum EitherWriter<LeftWriter, RightWriter> {
+    Left(LeftWriter),
+    Right(RightWriter),
 }
 
-impl<ObjectWriter, BaseWriter> Write for ObjectStackWriter<ObjectWriter, BaseWriter>
+impl<LeftWriter, RightWriter> Write for EitherWriter<LeftWriter, RightWriter>
 where
-    ObjectWriter: Write,
-    BaseWriter: Write,
+    LeftWriter: Write,
+    RightWriter: Write,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
-            ObjectStackWriter::Object(writer) => writer.write(buf),
-            ObjectStackWriter::Base(writer) => writer.write(buf),
+            EitherWriter::Left(writer) => writer.write(buf),
+            EitherWriter::Right(writer) => writer.write(buf),
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
         match self {
-            ObjectStackWriter::Object(writer) => writer.flush(),
-            ObjectStackWriter::Base(writer) => writer.flush(),
+            EitherWriter::Left(writer) => writer.flush(),
+            EitherWriter::Right(writer) => writer.flush(),
         }
     }
 }

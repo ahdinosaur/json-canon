@@ -147,3 +147,20 @@ fn test_sorting_utf() -> Result<(), Box<dyn Error>> {
     assert_eq!(actual, expected);
     Ok(())
 }
+
+#[test]
+fn test_weird_utf_1() -> Result<(), Box<dyn Error>> {
+    let input = r###"{"�\u0017B��":null,"�\u0017\\�4�":null}"###;
+    // let input = r#"{"�\u0017B��":true}"#;
+    let input_val: Value = from_str(input)?;
+    println!("input   : {} : {:?}", input, input.as_bytes());
+    let expected = input.to_string();
+    let actual = to_string(&input_val)?;
+    let normal = serde_json::to_string(&input_val)?;
+    println!("expected: {} : {:?}", expected, expected.as_bytes());
+    println!("actual  : {} : {:?}", actual, actual.as_bytes());
+    println!("normal  : {} : {:?}", normal, normal.as_bytes());
+    assert_eq!(normal, expected);
+    assert_eq!(actual, expected);
+    Ok(())
+}

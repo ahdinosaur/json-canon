@@ -1,11 +1,13 @@
 {
   "name": "json-canon-project",
   "scripts": {
-    "test": "npm run test --workspaces",
-    "bench": "npm run bench --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "bench": "npm run bench --workspaces --if-present",
     "format": "prettier --write \"./js/*/(src|test|bench)/**/*.js\"",
     "format-staged": "pretty-quick --staged -pattern \"./js/*/(src|test|bench)/**/*.js\"",
-    "generate-test-nums": "node jcs-test-data/numgen"
+    "generate": "npm run generate:numbers && npm run generate:json",
+    "generate:numbers": "node js/json-canon-fuzz/src/numbers test-data/generated/numbers.txt",
+    "generate:json": "node js/json-canon-fuzz/src/json test-data/generated/json.txt"
   },
   "workspaces": [
     "./js/*"
