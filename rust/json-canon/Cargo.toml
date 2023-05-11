@@ -1,0 +1,26 @@
+[package]
+name = "json-canon"
+version = "0.1.0"
+authors = ["Michael Williams <hello@mikey.nz>"]
+edition = "2021"
+license = "Apache-2.0"
+description = "Serialize JSON into a canonical format."
+repository = "https://github.com/ahdinosaur/json-canon"
+keywords = ["json", "serde", "serialization", "canonical"]
+categories = ["encoding"]
+include = ["src/**/*.rs", "README.md", "LICENSE"]
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ryu-js = { version = "0.2.2", default-features = false }
+serde = { version = "1.0.162", default-features = false }
+serde_json = { version = "1.0.96", default-features = false, features = ["std", "float_roundtrip"] }
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "basic"
+harness = false
