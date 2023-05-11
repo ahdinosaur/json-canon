@@ -55,12 +55,9 @@ impl ObjectEntry {
         Ok(())
     }
 
-    pub(crate) fn to_value_writer<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
+    pub(crate) fn to_ser_writer<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
         if !self.is_key_done {
-            Err(Error::new(
-                ErrorKind::InvalidData,
-                "Value writer requested when key is not done.",
-            ))
+            Ok(&mut self.key_ser)
         } else {
             Ok(&mut self.value_ser)
         }
@@ -127,8 +124,8 @@ impl Object {
         Ok(self.current_entry()?.write(bytes)?)
     }
 
-    pub(crate) fn to_value_writer<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
-        Ok(self.current_entry()?.to_value_writer()?)
+    pub(crate) fn to_ser_writer<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
+        Ok(self.current_entry()?.to_ser_writer()?)
     }
 
     pub(crate) fn write_out<W>(&mut self, writer: &mut W) -> io::Result<()>
@@ -195,10 +192,10 @@ impl ObjectStack {
         })?;
 
         if self.has_current_object() {
-            let mut writer = self.current_object()?.to_value_writer()?;
-            object.write_out(&mut writer);
+            let mut writer = self.current_object()?.to_ser_writer()?;
+            object.write_out(&mut writer)?;
         } else {
-            object.write_out(writer);
+            object.write_out(writer)?;
         }
         Ok(())
     }
@@ -212,8 +209,8 @@ impl ObjectStack {
     }
 
     pub(crate) fn write_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
-        let writer = if self.has_current_object() {
-            self.current_object()?.write_orig(bytes)?
+        if self.has_current_object() {
+            self.current_object()?.write_orig(bytes)?;
         };
         Ok(())
     }
@@ -242,7 +239,7 @@ impl ObjectStack {
         Ok(())
     }
 
-    pub(crate) fn to_value_writer<'a, W>(
+    pub(crate) fn to_ser_writer<'a, W>(
         &'a mut self,
         writer: &'a mut W,
     ) -> io::Result<impl Write + 'a>
@@ -250,7 +247,7 @@ impl ObjectStack {
         W: Write + ?Sized,
     {
         let writer: ObjectStackWriter<_, _> = if self.has_current_object() {
-            let object_writer = self.current_object()?.to_value_writer()?;
+            let object_writer = self.current_object()?.to_ser_writer()?;
             ObjectStackWriter::Object(object_writer)
         } else {
             ObjectStackWriter::Base(writer)
