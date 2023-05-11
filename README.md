@@ -34,5 +34,3 @@ The JSON Canonicalization Scheme concept in a nutshell:
 
 - [`cyberphone/ietf-json-canon`](https://github.com/cyberphone/ietf-json-canon)
 - [`cyberphone/json-canonicalization`](https://github.com/cyberphone/json-canonicalization)
-- [`erdtman/canonicalize`](https://github.com/erdtman/canonicalize)
-- [`l1h3r/serde_jcs`](https://github.com/l1h3r/serde_jcs)

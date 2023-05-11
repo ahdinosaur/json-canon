@@ -65,4 +65,4 @@ limitations under the License.
 
 ## Related
 
-- [`serde_jcs`](https://github.com/l1h3r/serde_jcs)
+- [`l1h3r/serde_jcs`](https://github.com/l1h3r/serde_jcs)
