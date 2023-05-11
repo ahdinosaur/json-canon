@@ -1,5 +1,11 @@
+use std::{
+    env::current_dir,
+    fs::File,
+    io::{self, BufRead, BufReader},
+    path::Path,
+};
+
 use json_canon::to_string;
-use serde_json::{from_str, Value};
 
 #[test]
 fn test_numbers() {
@@ -41,4 +47,39 @@ fn test_numbers() {
     test_json_number(0x41b3de4355555557, "333333333.33333343");
     test_json_number(0xbecbf647612f3696, "-0.0000033333333333333333");
     test_json_number(0x43143ff3c1cb0959, "1424953923781206.2"); // Round to even
+}
+
+#[test]
+fn test_number_data() -> Result<(), io::Error> {
+    #[track_caller]
+    fn test_json_number(bits: u64, expected: &str) {
+        assert_eq!(to_string(&f64::from_bits(bits)).unwrap(), expected);
+    }
+
+    let test_data_path = current_dir()?.join(Path::new("../../jcs-test-data/test-nums-1m.txt"));
+
+    let file = File::open(test_data_path)?;
+    let reader = BufReader::new(file);
+    for line_result in reader.lines() {
+        let line = line_result?;
+        let mut split = line.split(',');
+        let bits_str = split.next().ok_or(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Test data: `bits` not found",
+        ))?;
+        let bits = u64::from_str_radix(bits_str, 16).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Test data: `bits` not parseable to u64",
+            )
+        })?;
+        let expected = split.next().ok_or(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Test data: `expected` not found",
+        ))?;
+        assert_eq!(split.next(), None);
+        test_json_number(bits, expected);
+    }
+
+    Ok(())
 }
