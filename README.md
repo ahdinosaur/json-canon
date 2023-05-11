@@ -1,6 +1,10 @@
-# `json-canon`
+<h1 align="center">`json-canon`</h1>
 
-Serialize JSON into a canonical format.
+<div align="center">
+  <strong>
+    Serialize JSON into a canonical format.
+  </strong>
+</div>
 
 Safe for generating a consistent cryptographic hash or signature across platforms.
 
@@ -24,7 +28,7 @@ The JSON Canonicalization Scheme concept in a nutshell:
 
 ### Rust
 
-TODO
+[`json-canon`](./rust/json-canon)
 
 ## References
 

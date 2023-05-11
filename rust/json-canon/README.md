@@ -1,5 +1,9 @@
 # `json-canon`
 
+[![Crates.io version](https://img.shields.io/crates/v/json-canon.svg?style=flat-square)](https://crates.io/crates/json-canon) [![Download](https://img.shields.io/crates/d/json-canon.svg?style=flat-square)](https://crates.io/crates/json-canon) [![docs.rs docs](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://docs.rs/json-canon)
+
+Serialize JSON into a canonical format.
+
 ## Install
 
 ```shell
@@ -27,7 +31,7 @@ See [`./examples/basic.rs`](./examples/basic.rs)
 
 ## Usage
 
-TODO
+See [docs](https://docs.rs/json-canon/)
 
 ## Caveats
 
@@ -35,7 +39,11 @@ Different from [the JavaScript implementation](../../js/json-canon), `serde_json
 
 ## Bench
 
-TODO
+```
+from_elem/basic/[{"_id":"59ef4a83ee8364808d761beb","about":"Nisi reprehenderit nulla ad officia pari...
+                        time:   [52.791 µs 52.919 µs 53.102 µs]
+                        thrpt:  [18.832 Kelem/s 18.897 Kelem/s 18.943 Kelem/s]
+```
 
 ## License
 
