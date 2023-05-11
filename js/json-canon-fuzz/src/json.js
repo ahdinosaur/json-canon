@@ -6,7 +6,7 @@ const serialize = require('json-canon')
 const args = process.argv.slice(2)
 
 const outputFilePath = join(process.cwd(), args[0])
-const total = 1e4
+const total = 1e6
 
 const outputFile = createWriteStream(outputFilePath)
 
