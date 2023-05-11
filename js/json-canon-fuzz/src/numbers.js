@@ -13,17 +13,14 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 //
-
-// This node.js program generates "es6testfile100m.txt".
 //
-// Run the program with:
-//  node numgen.js
+// This file copied from https://github.com/cyberphone/json-canonicalization/blob/57a0ce2/testdata/numgen.js
 
 const crypto = require("crypto")
 const { join } = require('path')
 const { createWriteStream } = require('fs')
 
-const outputFile = join(__dirname, "test-nums-1m.txt")
+const outputFile = join(__dirname, "test-nums.txt")
 const numLines   = 1e6
 
 const staticU64s = new BigUint64Array([

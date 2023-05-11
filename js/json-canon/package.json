@@ -26,14 +26,8 @@
   ],
   "author": "Michael Williams <hello@mikey.nz>",
   "contributors": [
-    {
-      "name": "Samuel Erdtman",
-      "email": "samuel@erdtman.se"
-    },
-    {
-      "name": "Anders Rundgren",
-      "email": "anders.rundgren.net@gmail.com"
-    }
+    "Samuel Erdtman <samuel@erdtman.se>",
+    "Anders Rundgren <anders.rundgren.net@gmail.com>"
   ],
   "license": "Apache-2.0",
   "bugs": {
@@ -52,6 +46,11 @@
     "json-stable-stringify": "latest",
     "json-stringify-deterministic": "latest",
     "json-stringify-safe": "latest",
-    "safe-stable-stringify": "latest"
+    "safe-stable-stringify": "latest",
+    "slump": "^3.0.2"
+  },
+  "directories": {
+    "example": "examples",
+    "test": "test"
   }
 }
