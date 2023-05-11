@@ -14,7 +14,7 @@ cargo add json-canon
 
 ```rust
 use json_canon::to_string;
-use serde_json::{json, Error};
+use serde_json::json;
 
 let data = json!({
     "from_account": "543 232 625-3",
@@ -41,8 +41,8 @@ Different from [the JavaScript implementation](../../js/json-canon), `serde_json
 
 ```
 from_elem/basic/[{"_id":"59ef4a83ee8364808d761beb","about":"Nisi reprehenderit nulla ad officia pari...
-                        time:   [52.791 µs 52.919 µs 53.102 µs]
-                        thrpt:  [18.832 Kelem/s 18.897 Kelem/s 18.943 Kelem/s]
+                        time:   [28.019 µs 28.032 µs 28.047 µs]
+                        thrpt:  [35.654 Kelem/s 35.673 Kelem/s 35.690 Kelem/s]
 ```
 
 ## License
