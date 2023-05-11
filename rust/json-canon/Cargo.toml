@@ -8,7 +8,6 @@ description = "Serialize JSON into a canonical format."
 repository = "https://github.com/ahdinosaur/json-canon"
 keywords = ["json", "serde", "serialization", "canonical"]
 categories = ["encoding"]
-include = ["src/**/*.rs", "README.md", "LICENSE"]
 readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
