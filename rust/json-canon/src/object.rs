@@ -24,6 +24,7 @@ impl ObjectEntry {
         }
     }
 
+    #[inline]
     pub(crate) fn cmpable<'a>(&'a self) -> impl Iterator<Item = impl Ord + 'a> {
         let key_orig = unsafe { from_utf8_unchecked(self.key_orig.as_slice()) };
         key_orig.encode_utf16()
@@ -63,10 +64,12 @@ impl ObjectEntry {
         }
     }
 
+    #[inline]
     pub(crate) fn end_key(&mut self) {
         self.is_key_done = true;
     }
 
+    #[inline]
     pub(crate) fn write_out<W>(&self, first: bool, writer: &mut W) -> io::Result<()>
     where
         W: Write + ?Sized,
@@ -104,10 +107,12 @@ impl Object {
         })
     }
 
+    #[inline]
     pub(crate) fn start_key(&mut self) {
         self.entries.push(ObjectEntry::new())
     }
 
+    #[inline]
     pub(crate) fn end_key(&mut self) -> io::Result<()> {
         Ok(self.current_entry()?.end_key())
     }
@@ -128,6 +133,7 @@ impl Object {
         Ok(self.current_entry()?.to_ser_writer()?)
     }
 
+    #[inline]
     pub(crate) fn write_out<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: Write + ?Sized,
@@ -176,10 +182,12 @@ impl ObjectStack {
         !self.objects.is_empty()
     }
 
+    #[inline]
     pub(crate) fn start_object(&mut self) {
         self.objects.push_front(Object::new())
     }
 
+    #[inline]
     pub(crate) fn end_object<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: Write + ?Sized,
@@ -200,10 +208,12 @@ impl ObjectStack {
         Ok(())
     }
 
+    #[inline]
     pub(crate) fn start_key(&mut self) -> io::Result<()> {
         Ok(self.current_object()?.start_key())
     }
 
+    #[inline]
     pub(crate) fn end_key(&mut self) -> io::Result<()> {
         Ok(self.current_object()?.end_key()?)
     }
