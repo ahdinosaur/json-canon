@@ -2,10 +2,6 @@
   "name": "json-canon-fuzz",
   "private": true,
   "main": "index.js",
-  "scripts": {
-    "generate:json": "node src/json",
-    "generate:numbers": "node src/numbers"
-  },
   "author": "Michael Williams",
   "license": "Apache-2.0",
   "dependencies": {
