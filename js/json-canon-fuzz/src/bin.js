@@ -47,4 +47,3 @@ function getOutputStream(outputFilePath) {
   }
   return process.stdout
 }
-

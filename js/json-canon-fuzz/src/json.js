@@ -16,13 +16,13 @@ function generateJson(options) {
   let i = 0
 
   return new Readable({
-    read () {
+    read() {
       if (i >= numLines) {
         this.push(null)
         return
       }
       this.push(nextLine(i++))
-    }
+    },
   })
 
   function nextLine() {
