@@ -5,14 +5,16 @@ const serialize = require('json-canon')
 
 const args = process.argv.slice(2)
 
-const outputFilePath = join(process.cwd(), args[0])
-const total = 1e6
+const numLines = parseInt(args[0])
+const outputFilePath = args[1]
 
-const outputFile = createWriteStream(outputFilePath)
+const outputStream = getOutputStream(outputFilePath)
 
 function next(i = 0) {
-  if (i === total) {
-    outputFile.close()
+  if (i >= numLines) {
+    if (outputStream.close != null) {
+      outputStream.close()
+    }
     return
   }
 
@@ -28,12 +30,12 @@ function next(i = 0) {
       err.message ===
       'Strings must be valid Unicode and not contain any surrogate pairs'
     ) {
-      return next(i + 1)
+      return next(i)
     }
     throw err
   }
 
-  write(outputFile, json + '\n', function (err) {
+  write(outputStream, json + '\n', function (err) {
     if (err) throw err
     next(i + 1)
   })
@@ -47,4 +49,12 @@ function write(stream, data, cb) {
   } else {
     process.nextTick(cb)
   }
+}
+
+function getOutputStream(outputFilePath) {
+  if (outputFilePath) {
+    const outputFileFullPath = join(process.cwd(), outputFilePath)
+    return createWriteStream(outputFileFullPath, { encoding: 'utf8' })
+  }
+  return process.stdout
 }

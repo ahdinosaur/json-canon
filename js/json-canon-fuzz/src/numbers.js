@@ -22,9 +22,56 @@ const { join } = require('path')
 
 const args = process.argv.slice(2)
 
-const outputFile = join(process.cwd(), args[0])
-const numLines = 1e6
+const numLines = parseInt(args[0])
+const outputFilePath = args[1]
 
+const outputStream = getOutputStream(outputFilePath)
+const generateNext = createNumberGenerator()
+
+var u64 = new BigUint64Array(1)
+var f64 = new Float64Array(u64.buffer)
+var hash = crypto.createHash('sha256')
+
+next()
+
+function next(i = 0) {
+  if (i >= numLines) {
+    if (outputStream.close != null) {
+      outputStream.close()
+    }
+    // console.log(hash.digest('hex'))
+    return
+  }
+
+  // if (i % 1e3 === 0) console.log(i)
+
+  f64[0] = generateNext()
+  line = u64[0].toString(16) + ',' + f64[0].toString() + '\n'
+  hash.update(line)
+
+  write(outputStream, line, function (err) {
+    if (err) throw err
+    next(i + 1)
+  })
+}
+
+function write(stream, data, cb) {
+  if (!stream.write(data, 'utf8')) {
+    stream.once('drain', cb)
+  } else {
+    process.nextTick(cb)
+  }
+}
+
+function getOutputStream(outputFilePath) {
+  if (outputFilePath) {
+    const outputFileFullPath = join(process.cwd(), outputFilePath)
+    return createWriteStream(outputFileFullPath, { encoding: 'utf8' })
+  }
+  return process.stdout
+}
+
+function createNumberGenerator() {
 const staticU64s = new BigUint64Array([
   0x0000000000000000n,
   0x8000000000000000n,
@@ -207,7 +254,9 @@ var state = {
   data: new Float64Array(),
   block: new ArrayBuffer(32),
 }
-function next() {
+
+return function nextNumber() {
+
   var f = 0.0
   if (state.idx < staticF64s.length) {
     f = staticF64s[state.idx]
@@ -218,7 +267,7 @@ function next() {
       if (state.data.length == 0) {
         state.block = crypto
           .createHash('sha256')
-          .update(new Buffer(state.block))
+          .update(new Buffer.from(state.block))
           .digest().buffer
         state.data = new Float64Array(state.block)
       }
@@ -229,18 +278,4 @@ function next() {
   state.idx++
   return f
 }
-
-// TODO: Emit the file as GZIP compressed.
-// TODO: Fix a buffering issue where Node.js tries to buffer the entire output.
-var f = createWriteStream(outputFile)
-var u64 = new BigUint64Array(1)
-var f64 = new Float64Array(u64.buffer)
-var hash = crypto.createHash('sha256')
-for (i = 0; i < numLines; i++) {
-  f64[0] = next()
-  line = u64[0].toString(16) + ',' + f64[0].toString() + '\n'
-  f.write(line)
-  hash.update(line)
 }
-f.close()
-console.log(hash.digest('hex'))
