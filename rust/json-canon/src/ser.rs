@@ -133,13 +133,13 @@ impl Formatter for CanonicalFormatter {
                 self.stack.write_key_orig(&[0x22])?;
                 self.stack.write(writer, b"\\\"")?;
             }
-            CharEscape::ReverseSolidus => {
-                self.stack.write_key_orig(&[0x5C])?;
-                self.stack.write(writer, b"\\\\")?;
-            }
             CharEscape::Solidus => {
                 self.stack.write_key_orig(&[0x2F])?;
                 self.stack.write(writer, b"\\/")?;
+            }
+            CharEscape::ReverseSolidus => {
+                self.stack.write_key_orig(&[0x5C])?;
+                self.stack.write(writer, b"\\\\")?;
             }
             CharEscape::AsciiControl(control) => {
                 self.stack.write_key_orig(&[control])?;
