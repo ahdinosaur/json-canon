@@ -88,10 +88,11 @@ fn test_number_data_from_file() -> Result<(), io::Error> {
 
 #[test]
 fn test_data_from_command() -> Result<(), io::Error> {
-    let test_command_path = current_dir()?.join(Path::new("../../js/json-canon-fuzz/src/numbers"));
+    let test_command_path = current_dir()?.join(Path::new("../../js/json-canon-fuzz/src/bin"));
 
     let mut child = Command::new("node")
         .arg(test_command_path)
+        .arg("numbers")
         .arg("100000")
         .stdout(Stdio::piped())
         .spawn()

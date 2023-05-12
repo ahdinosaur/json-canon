@@ -32,10 +32,11 @@ fn test_json_data_from_file() -> Result<(), io::Error> {
 
 #[test]
 fn test_json_data_from_command() -> Result<(), io::Error> {
-    let test_command_path = current_dir()?.join(Path::new("../../js/json-canon-fuzz/src/json"));
+    let test_command_path = current_dir()?.join(Path::new("../../js/json-canon-fuzz/src/bin"));
 
     let mut child = Command::new("node")
         .arg(test_command_path)
+        .arg("json")
         .arg("100000")
         .stdout(Stdio::piped())
         .spawn()
