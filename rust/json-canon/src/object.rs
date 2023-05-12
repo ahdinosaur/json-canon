@@ -8,59 +8,19 @@ use serde_json::ser::{CompactFormatter, Formatter};
 
 #[derive(Clone, Debug)]
 pub(crate) struct ObjectEntry {
+    key: Vec<u8>,
     key_orig: Vec<u8>,
-    key_ser: Vec<u8>,
-    value_ser: Vec<u8>,
+    value: Vec<u8>,
     is_key_done: bool,
 }
 
 impl ObjectEntry {
     pub(crate) fn new() -> Self {
         Self {
+            key: Vec::new(),
             key_orig: Vec::new(),
-            key_ser: Vec::new(),
-            value_ser: Vec::new(),
+            value: Vec::new(),
             is_key_done: false,
-        }
-    }
-
-    #[inline]
-    pub(crate) fn cmpable<'a>(&'a self) -> impl Iterator<Item = impl Ord + 'a> {
-        let key_orig = unsafe { from_utf8_unchecked(self.key_orig.as_slice()) };
-        key_orig.encode_utf16()
-    }
-
-    pub(crate) fn write_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
-        if !self.is_key_done {
-            self.key_orig.write_all(bytes)?;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn write_ser(&mut self, bytes: &[u8]) -> io::Result<()> {
-        if self.is_key_done {
-            self.value_ser.write_all(bytes)?;
-        } else {
-            self.key_ser.write_all(bytes)?;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn write(&mut self, bytes: &[u8]) -> io::Result<()> {
-        if self.is_key_done {
-            self.value_ser.write_all(bytes)?;
-        } else {
-            self.key_orig.write_all(bytes)?;
-            self.key_ser.write_all(bytes)?;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn to_ser_writer<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
-        if !self.is_key_done {
-            Ok(&mut self.key_ser)
-        } else {
-            Ok(&mut self.value_ser)
         }
     }
 
@@ -70,16 +30,39 @@ impl ObjectEntry {
     }
 
     #[inline]
-    pub(crate) fn write_out<W>(&self, first: bool, writer: &mut W) -> io::Result<()>
+    pub(crate) fn cmpable<'a>(&'a self) -> impl Iterator<Item = impl Ord + 'a> {
+        let key_orig = unsafe { from_utf8_unchecked(self.key_orig.as_slice()) };
+        key_orig.encode_utf16()
+    }
+
+    #[inline]
+    pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
+        if !self.is_key_done {
+            self.key_orig.extend_from_slice(bytes);
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub(crate) fn scope<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
+        if !self.is_key_done {
+            Ok(&mut self.key)
+        } else {
+            Ok(&mut self.value)
+        }
+    }
+
+    #[inline]
+    pub(crate) fn to_writer<W>(&self, first: bool, writer: &mut W) -> io::Result<()>
     where
         W: Write + ?Sized,
     {
         CompactFormatter.begin_object_key(writer, first)?;
-        writer.write_all(self.key_ser.as_slice())?;
+        writer.write_all(self.key.as_slice())?;
         CompactFormatter.end_object_key(writer)?;
 
         CompactFormatter.begin_object_value(writer)?;
-        writer.write_all(self.value_ser.as_slice())?;
+        writer.write_all(self.value.as_slice())?;
         CompactFormatter.end_object_value(writer)?;
 
         Ok(())
@@ -117,24 +100,18 @@ impl Object {
         Ok(self.current_entry()?.end_key())
     }
 
-    pub(crate) fn write_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current_entry()?.write_orig(bytes)?)
-    }
-
-    pub(crate) fn write_ser(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current_entry()?.write_ser(bytes)?)
-    }
-
-    pub(crate) fn write(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current_entry()?.write(bytes)?)
-    }
-
-    pub(crate) fn to_ser_writer<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
-        Ok(self.current_entry()?.to_ser_writer()?)
+    #[inline]
+    pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
+        Ok(self.current_entry()?.write_key_orig(bytes)?)
     }
 
     #[inline]
-    pub(crate) fn write_out<W>(&mut self, writer: &mut W) -> io::Result<()>
+    pub(crate) fn scope<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
+        Ok(self.current_entry()?.scope()?)
+    }
+
+    #[inline]
+    pub(crate) fn to_writer<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: Write + ?Sized,
     {
@@ -146,7 +123,7 @@ impl Object {
 
         let mut first = true;
         for entry in entries {
-            entry.write_out(first, writer)?;
+            entry.to_writer(first, writer)?;
 
             first = false;
         }
@@ -200,10 +177,10 @@ impl ObjectStack {
         })?;
 
         if self.has_current_object() {
-            let mut writer = self.current_object()?.to_ser_writer()?;
-            object.write_out(&mut writer)?;
+            let mut writer = self.current_object()?.scope()?;
+            object.to_writer(&mut writer)?;
         } else {
-            object.write_out(writer)?;
+            object.to_writer(writer)?;
         }
         Ok(())
     }
@@ -218,75 +195,48 @@ impl ObjectStack {
         Ok(self.current_object()?.end_key()?)
     }
 
-    pub(crate) fn write_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
+    pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
         if self.has_current_object() {
-            self.current_object()?.write_orig(bytes)?;
+            self.current_object()?.write_key_orig(bytes)?;
         };
         Ok(())
     }
 
-    pub(crate) fn write_ser<'a, W>(&'a mut self, writer: &'a mut W, bytes: &[u8]) -> io::Result<()>
+    pub(crate) fn scope<'a, W>(&'a mut self, writer: &'a mut W) -> io::Result<impl Write + 'a>
     where
         W: Write + ?Sized,
     {
-        if self.has_current_object() {
-            self.current_object()?.write_ser(bytes)?
+        let writer: EitherWriter<_, _> = if self.has_current_object() {
+            let object_writer = self.current_object()?.scope()?;
+            EitherWriter::Left(object_writer)
         } else {
-            writer.write_all(bytes)?;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn write<'a, W>(&'a mut self, writer: &'a mut W, bytes: &[u8]) -> io::Result<()>
-    where
-        W: Write + ?Sized,
-    {
-        if self.has_current_object() {
-            self.current_object()?.write(bytes)?
-        } else {
-            writer.write_all(bytes)?;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn to_ser_writer<'a, W>(
-        &'a mut self,
-        writer: &'a mut W,
-    ) -> io::Result<impl Write + 'a>
-    where
-        W: Write + ?Sized,
-    {
-        let writer: ObjectStackWriter<_, _> = if self.has_current_object() {
-            let object_writer = self.current_object()?.to_ser_writer()?;
-            ObjectStackWriter::Object(object_writer)
-        } else {
-            ObjectStackWriter::Base(writer)
+            EitherWriter::Right(writer)
         };
         Ok(writer)
     }
 }
 
-enum ObjectStackWriter<ObjectWriter, BaseWriter> {
-    Object(ObjectWriter),
-    Base(BaseWriter),
+enum EitherWriter<LeftWriter, RightWriter> {
+    Left(LeftWriter),
+    Right(RightWriter),
 }
 
-impl<ObjectWriter, BaseWriter> Write for ObjectStackWriter<ObjectWriter, BaseWriter>
+impl<LeftWriter, RightWriter> Write for EitherWriter<LeftWriter, RightWriter>
 where
-    ObjectWriter: Write,
-    BaseWriter: Write,
+    LeftWriter: Write,
+    RightWriter: Write,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
-            ObjectStackWriter::Object(writer) => writer.write(buf),
-            ObjectStackWriter::Base(writer) => writer.write(buf),
+            EitherWriter::Left(writer) => writer.write(buf),
+            EitherWriter::Right(writer) => writer.write(buf),
         }
     }
 
     fn flush(&mut self) -> io::Result<()> {
         match self {
-            ObjectStackWriter::Object(writer) => writer.flush(),
-            ObjectStackWriter::Base(writer) => writer.flush(),
+            EitherWriter::Left(writer) => writer.flush(),
+            EitherWriter::Right(writer) => writer.flush(),
         }
     }
 }

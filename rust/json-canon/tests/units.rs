@@ -147,3 +147,13 @@ fn test_sorting_utf() -> Result<(), Box<dyn Error>> {
     assert_eq!(actual, expected);
     Ok(())
 }
+
+#[test]
+fn test_utf8_sort_bug() -> Result<(), Box<dyn Error>> {
+    let input = r###"{"�\u0017B��":null,"�\u0017\\�4�":null}"###;
+    let input_val: Value = from_str(input)?;
+    let expected = input.to_string();
+    let actual = to_string(&input_val)?;
+    assert_eq!(actual, expected);
+    Ok(())
+}

@@ -1,0 +1,39 @@
+{
+  "name": "json-canon-fuzz",
+  "version": "0.1.0",
+  "description": "Fuzzer to test whether your JSON serialization is canonical.",
+  "main": "src/index.js",
+  "bin": "src/bin.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ahdinosaur/json-canon.git"
+  },
+  "keywords": [
+    "json",
+    "jcs",
+    "rfc8785",
+    "canon",
+    "canonical",
+    "canonicalize",
+    "crypto",
+    "fuzz",
+    "fuzzer",
+    "fuzzing",
+    "random",
+    "generator"
+  ],
+  "author": "Michael Williams <hello@mikey.nz>",
+  "contributors": [
+    "Anders Rundgren <anders.rundgren.net@gmail.com>"
+  ],
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/ahdinosaur/json-canon/issues"
+  },
+  "homepage": "https://github.com/ahdinosaur/json-canon#readme",
+  "dependencies": {
+    "json-canon": "^1.0.0",
+    "readable-stream": "^4.4.0",
+    "slump": "^3.0.2"
+  }
+}

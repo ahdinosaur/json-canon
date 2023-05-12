@@ -3,6 +3,8 @@ use std::{
     fs::File,
     io::{self, BufRead, BufReader},
     path::Path,
+    process::{Command, Stdio},
+    str,
 };
 
 use json_canon::to_string;
@@ -50,13 +52,13 @@ fn test_numbers() {
 }
 
 #[test]
-fn test_number_data() -> Result<(), io::Error> {
-    #[track_caller]
-    fn test_json_number(bits: u64, expected: &str) {
-        assert_eq!(to_string(&f64::from_bits(bits)).unwrap(), expected);
-    }
+fn test_number_data_from_file() -> Result<(), io::Error> {
+    let test_data_path = current_dir()?.join(Path::new("../../test-data/generated/numbers.txt"));
 
-    let test_data_path = current_dir()?.join(Path::new("../../jcs-test-data/test-nums-1m.txt"));
+    // only run test if generated file exists
+    if !test_data_path.exists() {
+        return Ok(());
+    }
 
     let file = File::open(test_data_path)?;
     let reader = BufReader::new(file);
@@ -82,4 +84,53 @@ fn test_number_data() -> Result<(), io::Error> {
     }
 
     Ok(())
+}
+
+#[test]
+fn test_data_from_command() -> Result<(), io::Error> {
+    let test_command_path = current_dir()?.join(Path::new("../../js/json-canon-fuzz/src/bin"));
+
+    let mut child = Command::new("node")
+        .arg(test_command_path)
+        .arg("numbers")
+        .arg("100000")
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Failed to execute command");
+
+    let stdout = child.stdout.as_mut().expect("Failed to open stdout");
+    let reader = io::BufReader::new(stdout);
+
+    for line_result in reader.lines() {
+        let line = line_result?;
+
+        let mut split = line.split(',');
+        let bits_str = split.next().ok_or(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Test data: `bits` not found",
+        ))?;
+        let bits = u64::from_str_radix(bits_str, 16).map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Test data: `bits` not parseable to u64",
+            )
+        })?;
+        let expected = split.next().ok_or(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Test data: `expected` not found",
+        ))?;
+        assert_eq!(split.next(), None);
+
+        test_json_number(bits, expected);
+    }
+
+    let ecode = child.wait()?;
+    assert!(ecode.success());
+
+    Ok(())
+}
+
+#[track_caller]
+fn test_json_number(bits: u64, expected: &str) {
+    assert_eq!(to_string(&f64::from_bits(bits)).unwrap(), expected);
 }
