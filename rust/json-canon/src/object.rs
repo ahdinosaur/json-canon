@@ -36,25 +36,15 @@ impl ObjectEntry {
     }
 
     #[inline]
-    pub(crate) fn write(&mut self, bytes: &[u8]) -> io::Result<()> {
-        if self.is_key_done {
-            self.value.write_all(bytes)?;
-        } else {
-            self.key.write_all(bytes)?;
-        }
-        Ok(())
-    }
-
-    #[inline]
     pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
         if !self.is_key_done {
-            self.key_orig.write_all(bytes)?;
+            self.key_orig.extend_from_slice(bytes);
         }
         Ok(())
     }
 
     #[inline]
-    pub(crate) fn to_writer<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
+    pub(crate) fn scope<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
         if !self.is_key_done {
             Ok(&mut self.key)
         } else {
@@ -63,7 +53,7 @@ impl ObjectEntry {
     }
 
     #[inline]
-    pub(crate) fn write_out<W>(&self, first: bool, writer: &mut W) -> io::Result<()>
+    pub(crate) fn to_writer<W>(&self, first: bool, writer: &mut W) -> io::Result<()>
     where
         W: Write + ?Sized,
     {
@@ -111,22 +101,17 @@ impl Object {
     }
 
     #[inline]
-    pub(crate) fn write(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current_entry()?.write(bytes)?)
-    }
-
-    #[inline]
     pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
         Ok(self.current_entry()?.write_key_orig(bytes)?)
     }
 
     #[inline]
-    pub(crate) fn to_writer<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
-        Ok(self.current_entry()?.to_writer()?)
+    pub(crate) fn scope<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
+        Ok(self.current_entry()?.scope()?)
     }
 
     #[inline]
-    pub(crate) fn write_out<W>(&mut self, writer: &mut W) -> io::Result<()>
+    pub(crate) fn to_writer<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
         W: Write + ?Sized,
     {
@@ -138,7 +123,7 @@ impl Object {
 
         let mut first = true;
         for entry in entries {
-            entry.write_out(first, writer)?;
+            entry.to_writer(first, writer)?;
 
             first = false;
         }
@@ -192,10 +177,10 @@ impl ObjectStack {
         })?;
 
         if self.has_current_object() {
-            let mut writer = self.current_object()?.to_writer()?;
-            object.write_out(&mut writer)?;
+            let mut writer = self.current_object()?.scope()?;
+            object.to_writer(&mut writer)?;
         } else {
-            object.write_out(writer)?;
+            object.to_writer(writer)?;
         }
         Ok(())
     }
@@ -210,18 +195,6 @@ impl ObjectStack {
         Ok(self.current_object()?.end_key()?)
     }
 
-    pub(crate) fn write<'a, W>(&'a mut self, writer: &'a mut W, bytes: &[u8]) -> io::Result<()>
-    where
-        W: Write + ?Sized,
-    {
-        if self.has_current_object() {
-            self.current_object()?.write(bytes)?
-        } else {
-            writer.write_all(bytes)?;
-        }
-        Ok(())
-    }
-
     pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
         if self.has_current_object() {
             self.current_object()?.write_key_orig(bytes)?;
@@ -229,12 +202,12 @@ impl ObjectStack {
         Ok(())
     }
 
-    pub(crate) fn to_writer<'a, W>(&'a mut self, writer: &'a mut W) -> io::Result<impl Write + 'a>
+    pub(crate) fn scope<'a, W>(&'a mut self, writer: &'a mut W) -> io::Result<impl Write + 'a>
     where
         W: Write + ?Sized,
     {
         let writer: EitherWriter<_, _> = if self.has_current_object() {
-            let object_writer = self.current_object()?.to_writer()?;
+            let object_writer = self.current_object()?.scope()?;
             EitherWriter::Left(object_writer)
         } else {
             EitherWriter::Right(writer)
