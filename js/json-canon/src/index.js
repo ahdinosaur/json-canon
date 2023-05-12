@@ -2,7 +2,7 @@ module.exports = serialize
 
 /**
  * @param {unknown} value
- * @returns {string | undefined}
+ * @returns {string}
  */
 function serialize(value) {
   const type = typeof value
