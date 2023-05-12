@@ -60,10 +60,6 @@ The following table records the expected hashes:
 | b9f8a44a91d46813b21b9602e72f112613c91408db0b8341fb94603d9db135e0 | 10000000        | 403630048     |
 | 0f7dda6b0837dde083c5d6b896f7d62340c8a2415b0c7121d83145e08a755272 | 100000000       | 4036326174    |
 
-The entries in the table are determined apart from GZIP compression.
-
-The `SHA-256 checksum` is a hash of the generated output file for the first `Number of lines` in the sequence.
-
 ### JSON
 
 The test output consists of lines
