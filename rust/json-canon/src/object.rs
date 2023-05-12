@@ -4,14 +4,12 @@ use std::{
     str::from_utf8_unchecked,
 };
 
-use serde_json::{
-    ser::{CompactFormatter, Formatter},
-    Value,
-};
+use serde_json::ser::{CompactFormatter, Formatter};
 
 #[derive(Clone, Debug)]
 pub(crate) struct ObjectEntry {
     key: Vec<u8>,
+    key_orig: Vec<u8>,
     value: Vec<u8>,
     is_key_done: bool,
 }
@@ -20,6 +18,7 @@ impl ObjectEntry {
     pub(crate) fn new() -> Self {
         Self {
             key: Vec::new(),
+            key_orig: Vec::new(),
             value: Vec::new(),
             is_key_done: false,
         }
@@ -30,10 +29,10 @@ impl ObjectEntry {
         self.is_key_done = true;
     }
 
-    pub(crate) fn reparse_key<'a>(&'a self) -> Value {
-        let key_ser = unsafe { from_utf8_unchecked(self.key.as_slice()) };
-        let key: Value = serde_json::from_str(key_ser).unwrap();
-        key
+    #[inline]
+    pub(crate) fn cmpable<'a>(&'a self) -> impl Iterator<Item = impl Ord + 'a> {
+        let key_orig = unsafe { from_utf8_unchecked(self.key_orig.as_slice()) };
+        key_orig.encode_utf16()
     }
 
     #[inline]
@@ -46,6 +45,15 @@ impl ObjectEntry {
         Ok(())
     }
 
+    #[inline]
+    pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
+        if !self.is_key_done {
+            self.key_orig.write_all(bytes)?;
+        }
+        Ok(())
+    }
+
+    #[inline]
     pub(crate) fn to_writer<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
         if !self.is_key_done {
             Ok(&mut self.key)
@@ -102,10 +110,17 @@ impl Object {
         Ok(self.current_entry()?.end_key())
     }
 
+    #[inline]
     pub(crate) fn write(&mut self, bytes: &[u8]) -> io::Result<()> {
         Ok(self.current_entry()?.write(bytes)?)
     }
 
+    #[inline]
+    pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
+        Ok(self.current_entry()?.write_key_orig(bytes)?)
+    }
+
+    #[inline]
     pub(crate) fn to_writer<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
         Ok(self.current_entry()?.to_writer()?)
     }
@@ -119,13 +134,7 @@ impl Object {
 
         let mut entries = self.entries.clone();
 
-        entries.sort_by(|a, b| {
-            let a_orig = a.reparse_key();
-            let a_utf16 = a_orig.as_str().unwrap().encode_utf16();
-            let b_orig = b.reparse_key();
-            let b_utf16 = b_orig.as_str().unwrap().encode_utf16();
-            a_utf16.cmp(b_utf16)
-        });
+        entries.sort_by(|a, b| a.cmpable().cmp(b.cmpable()));
 
         let mut first = true;
         for entry in entries {
@@ -210,6 +219,13 @@ impl ObjectStack {
         } else {
             writer.write_all(bytes)?;
         }
+        Ok(())
+    }
+
+    pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
+        if self.has_current_object() {
+            self.current_object()?.write_key_orig(bytes)?;
+        };
         Ok(())
     }
 

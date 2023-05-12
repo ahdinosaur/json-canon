@@ -110,30 +110,39 @@ impl Formatter for CanonicalFormatter {
 
         match escape {
             CharEscape::Backspace => {
+                self.stack.write_key_orig(&[0x08])?;
                 self.stack.write(writer, b"\\b")?;
             }
             CharEscape::Tab => {
+                self.stack.write_key_orig(&[0x09])?;
                 self.stack.write(writer, b"\\t")?;
             }
             CharEscape::LineFeed => {
+                self.stack.write_key_orig(&[0x0A])?;
                 self.stack.write(writer, b"\\n")?;
             }
             CharEscape::FormFeed => {
+                self.stack.write_key_orig(&[0x0C])?;
                 self.stack.write(writer, b"\\f")?;
             }
             CharEscape::CarriageReturn => {
+                self.stack.write_key_orig(&[0x0D])?;
                 self.stack.write(writer, b"\\r")?;
             }
             CharEscape::Quote => {
+                self.stack.write_key_orig(&[0x22])?;
                 self.stack.write(writer, b"\\\"")?;
             }
-            CharEscape::Solidus => {
-                self.stack.write(writer, b"\\/")?;
-            }
             CharEscape::ReverseSolidus => {
+                self.stack.write_key_orig(&[0x5C])?;
                 self.stack.write(writer, b"\\\\")?;
             }
+            CharEscape::Solidus => {
+                self.stack.write_key_orig(&[0x2F])?;
+                self.stack.write(writer, b"\\/")?;
+            }
             CharEscape::AsciiControl(control) => {
+                self.stack.write_key_orig(&[control])?;
                 self.stack.write(
                     writer,
                     &[
@@ -165,6 +174,7 @@ impl Formatter for CanonicalFormatter {
         W: Write + ?Sized,
     {
         let bytes = fragment.as_bytes();
+        self.stack.write_key_orig(bytes)?;
         self.stack.write(writer, bytes)?;
         Ok(())
     }
