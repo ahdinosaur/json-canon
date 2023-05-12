@@ -3,45 +3,45 @@ const { join } = require('path')
 const random = require('slump')
 const serialize = require('json-canon')
 
-const args = process.argv.slice(2)
+module.exports = generateJson
 
-const numLines = parseInt(args[0])
-const outputFilePath = args[1]
+function generateJson(numLines, outputFilePath) {
+  const outputStream = getOutputStream(outputFilePath)
 
-const outputStream = getOutputStream(outputFilePath)
+  next()
 
-function next(i = 0) {
-  if (i >= numLines) {
-    if (outputStream.close != null) {
-      outputStream.close()
+  function next(i = 0) {
+    if (i >= numLines) {
+      if (outputStream.close != null) {
+        outputStream.close()
+      }
+      return
     }
-    return
-  }
 
-  // if (i % 1e3 === 0) console.log(i)
+    // if (i % 1e3 === 0) console.log(i)
 
-  const obj = random.json()
+    const obj = random.json()
 
-  let json
-  try {
-    json = serialize(obj)
-  } catch (err) {
-    if (
-      err.message ===
-      'Strings must be valid Unicode and not contain any surrogate pairs'
-    ) {
-      return next(i)
+    let json
+    try {
+      json = serialize(obj)
+    } catch (err) {
+      if (
+        err.message ===
+        'Strings must be valid Unicode and not contain any surrogate pairs'
+      ) {
+        return next(i)
+      }
+      throw err
     }
-    throw err
-  }
 
-  write(outputStream, json + '\n', function (err) {
-    if (err) throw err
-    next(i + 1)
-  })
+    write(outputStream, json + '\n', function (err) {
+      if (err) throw err
+      next(i + 1)
+    })
+}
 }
 
-next()
 
 function write(stream, data, cb) {
   if (!stream.write(data, 'utf8')) {
