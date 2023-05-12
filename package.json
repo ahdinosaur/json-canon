@@ -7,8 +7,8 @@
     "format-staged": "pretty-quick --staged -pattern \"./js/*/(src|test|bench)/**/*.js\"",
     "clean:generate": "rm test-data/generated/*",
     "generate": "npm run generate:numbers && npm run generate:json",
-    "generate:numbers": "node js/json-canon-fuzz/src/numbers 1000000 test-data/generated/numbers.txt",
-    "generate:json": "node js/json-canon-fuzz/src/json 100000 test-data/generated/json.txt"
+    "generate:numbers": "json-canon-fuzz numbers 1000000 test-data/generated/numbers.txt",
+    "generate:json": "json-canon-fuzz json 100000 test-data/generated/json.txt"
   },
   "workspaces": [
     "./js/*"

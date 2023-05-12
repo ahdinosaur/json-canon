@@ -17,57 +17,47 @@
 // This file originally copied from https://github.com/cyberphone/json-canonicalization/blob/57a0ce2/testdata/numgen.js
 
 const crypto = require('crypto')
-const { createWriteStream } = require('fs')
-const { join } = require('path')
+const { Readable } = require('readable-stream')
 
 module.exports = generateNumbers
 
-function generateNumbers(numLines, outputFilePath) {
-  const outputStream = getOutputStream(outputFilePath)
+/**
+ * @param {object} options
+ * @param {number} options.numLines
+ * @param {string | undefined} options.outputFilePath
+ * @returns {Readable}
+ */
+function generateNumbers(options) {
+  const { numLines, outputFilePath } = options
+
   const generateNumber = createNumberGenerator()
 
   let u64 = new BigUint64Array(1)
   let f64 = new Float64Array(u64.buffer)
   let hash = crypto.createHash('sha256')
 
-  next()
+  let i = 0
 
-  function next(i = 0) {
-    if (i >= numLines) {
-      if (outputStream.close != null) {
-        outputStream.close()
+  return new Readable({
+    read () {
+      if (i >= numLines) {
+        this.push(null)
+        if (outputFilePath) {
+          console.log(hash.digest('hex'))
+        }
+        return
       }
-      if (outputFilePath) {
-        console.log(hash.digest('hex'))
-      }
-      return
+      this.push(nextLine(i++))
     }
+  })
 
+  function nextLine() {
     f64[0] = generateNumber()
     line = u64[0].toString(16) + ',' + f64[0].toString() + '\n'
     hash.update(line)
 
-    write(outputStream, line, function (err) {
-      if (err) throw err
-      next(i + 1)
-    })
+    return line
   }
-}
-
-function write(stream, data, cb) {
-  if (!stream.write(data, 'utf8')) {
-    stream.once('drain', cb)
-  } else {
-    process.nextTick(cb)
-  }
-}
-
-function getOutputStream(outputFilePath) {
-  if (outputFilePath) {
-    const outputFileFullPath = join(process.cwd(), outputFilePath)
-    return createWriteStream(outputFileFullPath, { encoding: 'utf8' })
-  }
-  return process.stdout
 }
 
 function createNumberGenerator() {
@@ -129,7 +119,7 @@ function createNumberGenerator() {
     block: new ArrayBuffer(32),
   }
 
-  function nextNumber() {
+  return function nextNumber() {
     let f = 0.0
     if (state.idx < staticF64s.length) {
       f = staticF64s[state.idx]

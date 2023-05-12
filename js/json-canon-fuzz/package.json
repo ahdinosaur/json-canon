@@ -33,6 +33,7 @@
   "homepage": "https://github.com/ahdinosaur/json-canon#readme",
   "dependencies": {
     "json-canon": "^1.0.0",
+    "readable-stream": "^4.4.0",
     "slump": "^3.0.2"
   }
 }

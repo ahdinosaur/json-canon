@@ -1,25 +1,31 @@
-const { createWriteStream } = require('fs')
-const { join } = require('path')
 const random = require('slump')
 const serialize = require('json-canon')
+const { Readable } = require('readable-stream')
 
 module.exports = generateJson
 
-function generateJson(numLines, outputFilePath) {
-  const outputStream = getOutputStream(outputFilePath)
+/**
+ * @param {object} options
+ * @param {number} options.numLines
+ * @param {string | undefined} options.outputFilePath
+ * @returns {Readable}
+ */
+function generateJson(options) {
+  const { numLines } = options
 
-  next()
+  let i = 0
 
-  function next(i = 0) {
-    if (i >= numLines) {
-      if (outputStream.close != null) {
-        outputStream.close()
+  return new Readable({
+    read () {
+      if (i >= numLines) {
+        this.push(null)
+        return
       }
-      return
+      this.push(nextLine(i++))
     }
+  })
 
-    // if (i % 1e3 === 0) console.log(i)
-
+  function nextLine() {
     const obj = random.json()
 
     let json
@@ -30,31 +36,11 @@ function generateJson(numLines, outputFilePath) {
         err.message ===
         'Strings must be valid Unicode and not contain any surrogate pairs'
       ) {
-        return next(i)
+        return nextLine()
       }
       throw err
     }
 
-    write(outputStream, json + '\n', function (err) {
-      if (err) throw err
-      next(i + 1)
-    })
-}
-}
-
-
-function write(stream, data, cb) {
-  if (!stream.write(data, 'utf8')) {
-    stream.once('drain', cb)
-  } else {
-    process.nextTick(cb)
+    return json + '\n'
   }
-}
-
-function getOutputStream(outputFilePath) {
-  if (outputFilePath) {
-    const outputFileFullPath = join(process.cwd(), outputFilePath)
-    return createWriteStream(outputFileFullPath, { encoding: 'utf8' })
-  }
-  return process.stdout
 }
