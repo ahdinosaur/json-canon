@@ -1,6 +1,6 @@
 use std::{
     collections::VecDeque,
-    io::{self, Error, ErrorKind, Write},
+    io::{self, sink, Error, ErrorKind, Write},
     str::from_utf8_unchecked,
 };
 
@@ -9,7 +9,7 @@ use serde_json::ser::{CompactFormatter, Formatter};
 #[derive(Clone, Debug)]
 pub(crate) struct ObjectEntry {
     key: Vec<u8>,
-    key_orig: Vec<u8>,
+    key_bytes: Vec<u8>,
     value: Vec<u8>,
     is_key_done: bool,
 }
@@ -18,7 +18,7 @@ impl ObjectEntry {
     pub(crate) fn new() -> Self {
         Self {
             key: Vec::new(),
-            key_orig: Vec::new(),
+            key_bytes: Vec::new(),
             value: Vec::new(),
             is_key_done: false,
         }
@@ -29,27 +29,43 @@ impl ObjectEntry {
         self.is_key_done = true;
     }
 
+    pub(crate) fn is_in_key(&mut self) -> bool {
+        !self.is_key_done
+    }
+
     #[inline]
     pub(crate) fn cmpable<'a>(&'a self) -> impl Iterator<Item = impl Ord + 'a> {
-        let key_orig = unsafe { from_utf8_unchecked(self.key_orig.as_slice()) };
+        let key_orig = unsafe { from_utf8_unchecked(self.key_bytes.as_slice()) };
         key_orig.encode_utf16()
     }
 
     #[inline]
-    pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
-        if !self.is_key_done {
-            self.key_orig.extend_from_slice(bytes);
-        }
-        Ok(())
-    }
-
-    #[inline]
     pub(crate) fn scope<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
-        if !self.is_key_done {
+        if self.is_in_key() {
             Ok(&mut self.key)
         } else {
             Ok(&mut self.value)
         }
+    }
+
+    #[inline]
+    pub(crate) fn scope_with_key<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
+        let writer = if self.is_in_key() {
+            EitherWriter::Left(BothWriter::new(&mut self.key, &mut self.key_bytes))
+        } else {
+            EitherWriter::Right(&mut self.value)
+        };
+        Ok(writer)
+    }
+
+    #[inline]
+    pub(crate) fn key_bytes<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
+        let writer = if self.is_in_key() {
+            EitherWriter::Left(&mut self.key_bytes)
+        } else {
+            EitherWriter::Right(sink())
+        };
+        Ok(writer)
     }
 
     #[inline]
@@ -101,13 +117,23 @@ impl Object {
     }
 
     #[inline]
-    pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
-        Ok(self.current_entry()?.write_key_orig(bytes)?)
+    pub(crate) fn is_in_key(&mut self) -> io::Result<bool> {
+        Ok(self.current_entry()?.is_in_key())
     }
 
     #[inline]
     pub(crate) fn scope<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
         Ok(self.current_entry()?.scope()?)
+    }
+
+    #[inline]
+    pub(crate) fn scope_with_key<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
+        Ok(self.current_entry()?.scope_with_key()?)
+    }
+
+    #[inline]
+    pub(crate) fn key_bytes<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
+        Ok(self.current_entry()?.key_bytes()?)
     }
 
     #[inline]
@@ -195,11 +221,13 @@ impl ObjectStack {
         Ok(self.current_object()?.end_key()?)
     }
 
-    pub(crate) fn write_key_orig(&mut self, bytes: &[u8]) -> io::Result<()> {
+    #[inline]
+    pub(crate) fn is_in_key(&mut self) -> io::Result<bool> {
         if self.has_current_object() {
-            self.current_object()?.write_key_orig(bytes)?;
-        };
-        Ok(())
+            Ok(self.current_object()?.is_in_key()?)
+        } else {
+            Ok(false)
+        }
     }
 
     pub(crate) fn scope<'a, W>(&'a mut self, writer: &'a mut W) -> io::Result<impl Write + 'a>
@@ -211,6 +239,32 @@ impl ObjectStack {
             EitherWriter::Left(object_writer)
         } else {
             EitherWriter::Right(writer)
+        };
+        Ok(writer)
+    }
+
+    pub(crate) fn scope_with_key<'a, W>(
+        &'a mut self,
+        writer: &'a mut W,
+    ) -> io::Result<impl Write + 'a>
+    where
+        W: Write + ?Sized,
+    {
+        let writer: EitherWriter<_, _> = if self.has_current_object() {
+            let object_writer = self.current_object()?.scope_with_key()?;
+            EitherWriter::Left(object_writer)
+        } else {
+            EitherWriter::Right(writer)
+        };
+        Ok(writer)
+    }
+
+    pub(crate) fn key_bytes<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
+        let writer: EitherWriter<_, _> = if self.has_current_object() {
+            let key_bytes_writer = self.current_object()?.key_bytes()?;
+            EitherWriter::Left(key_bytes_writer)
+        } else {
+            EitherWriter::Right(sink())
         };
         Ok(writer)
     }
@@ -238,5 +292,35 @@ where
             EitherWriter::Left(writer) => writer.flush(),
             EitherWriter::Right(writer) => writer.flush(),
         }
+    }
+}
+
+struct BothWriter<LeftWriter, RightWriter> {
+    left: LeftWriter,
+    right: RightWriter,
+}
+
+impl<LeftWriter, RightWriter> BothWriter<LeftWriter, RightWriter> {
+    fn new(left: LeftWriter, right: RightWriter) -> Self {
+        Self { left, right }
+    }
+}
+
+impl<LeftWriter, RightWriter> Write for BothWriter<LeftWriter, RightWriter>
+where
+    LeftWriter: Write,
+    RightWriter: Write,
+{
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.left.write_all(buf)?;
+        self.right.write_all(buf)?;
+        self.flush()?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.left.flush()?;
+        self.right.flush()?;
+        Ok(())
     }
 }
