@@ -19,6 +19,7 @@ serde_json = { version = "1.0.96", default-features = false, features = ["std", 
 
 [dev-dependencies]
 criterion = "0.3"
+serde_derive = "1.0.163"
 
 [[bench]]
 name = "basic"
