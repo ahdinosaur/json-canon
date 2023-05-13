@@ -134,9 +134,12 @@ fn test_array_with_large_integer_values() -> io::Result<()> {
     macro_rules! create_input_rs {
         () => {
             vec![
-                9_100_000_000_000_000,
-                9_000_000_000_000_000,
-                9_200_000_000_000_000,
+                // 2.pow(60)
+                1152921504606846976,
+                // 2.pow(61)
+                2305843009213693952,
+                // 2.pow(62)
+                4611686018427387904,
             ]
         };
     }
@@ -149,9 +152,12 @@ fn test_array_with_large_integer_values() -> io::Result<()> {
         "u128 must be less than JSON max safe integer",
         input_rs_u128,
     )?;
-    test_err("i64 must be less than JSON max safe integer", input_rs_i64)?;
     test_err(
-        "i128 must be less than JSON max safe integer",
+        "i64.abs() must be less than JSON max safe integer",
+        input_rs_i64,
+    )?;
+    test_err(
+        "i128.abs() must be less than JSON max safe integer",
         input_rs_i128,
     )?;
     Ok(())

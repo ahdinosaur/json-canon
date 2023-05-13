@@ -228,10 +228,10 @@ impl Formatter for CanonicalFormatter {
         if self.stack.is_in_key()? {
             CompactFormatter.write_i64(&mut self.stack.scope_with_key(writer)?, value)
         } else {
-            if value > MAX_SAFE_INTEGER_I64 {
+            if value.abs() > MAX_SAFE_INTEGER_I64 {
                 Err(Error::new(
                     ErrorKind::InvalidData,
-                    "i64 must be less than JSON max safe integer",
+                    "i64.abs() must be less than JSON max safe integer",
                 ))
             } else {
                 CompactFormatter.write_i64(&mut self.stack.scope(writer)?, value)
@@ -247,10 +247,10 @@ impl Formatter for CanonicalFormatter {
         if self.stack.is_in_key()? {
             CompactFormatter.write_i128(&mut self.stack.scope_with_key(writer)?, value)
         } else {
-            if value > MAX_SAFE_INTEGER_I128 {
+            if value.abs() > MAX_SAFE_INTEGER_I128 {
                 Err(Error::new(
                     ErrorKind::InvalidData,
-                    "i128 must be less than JSON max safe integer",
+                    "i128.abs() must be less than JSON max safe integer",
                 ))
             } else {
                 CompactFormatter.write_i128(&mut self.stack.scope(writer)?, value)

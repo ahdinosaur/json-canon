@@ -11,11 +11,6 @@ use json_canon::to_string;
 
 #[test]
 fn test_numbers() {
-    #[track_caller]
-    fn test_json_number(bits: u64, expected: &str) {
-        assert_eq!(to_string(&f64::from_bits(bits)).unwrap(), expected);
-    }
-
     // fn test_json_number_err(bits: u64) {
     //   assert!(to_string(&f64::from_bits(bits)).is_err());
     // }
@@ -49,6 +44,58 @@ fn test_numbers() {
     test_json_number(0x41b3de4355555557, "333333333.33333343");
     test_json_number(0xbecbf647612f3696, "-0.0000033333333333333333");
     test_json_number(0x43143ff3c1cb0959, "1424953923781206.2"); // Round to even
+}
+
+#[test]
+fn test_valid_integers() -> io::Result<()> {
+    macro_rules! test_valid_integers {
+        ($($i:expr => $o:expr),+) => {
+            {
+                $(
+                    let actual = to_string(&$i)?;
+                    assert_eq!(actual, $o);
+                )+
+            }
+        };
+    }
+
+    test_valid_integers![
+        0_u8 => "0",
+        0_i8 => "0",
+        -0_i8 => "0",
+        0_i128 => "0",
+        -0_i128 => "0"
+    ];
+
+    Ok(())
+}
+
+#[test]
+fn test_invalid_integers() -> io::Result<()> {
+    macro_rules! test_invalid_integers {
+        ($($i:expr => $o:expr),+) => {
+            {
+                $(
+                    let result = to_string(&$i);
+                    assert!(result.is_err());
+                    let err = result.unwrap_err();
+                    assert_eq!(err.to_string(), $o);
+                )+
+            }
+        };
+    }
+
+    test_invalid_integers![
+        // 2.pow(60)
+        1152921504606846976_u64 => "u64 must be less than JSON max safe integer",
+        1152921504606846976_u128 => "u128 must be less than JSON max safe integer",
+        1152921504606846976_i64 => "i64.abs() must be less than JSON max safe integer",
+        1152921504606846976_i128 => "i128.abs() must be less than JSON max safe integer",
+        -1152921504606846976_i64 => "i64.abs() must be less than JSON max safe integer",
+        -1152921504606846976_i128 => "i128.abs() must be less than JSON max safe integer"
+    ];
+
+    Ok(())
 }
 
 #[test]
