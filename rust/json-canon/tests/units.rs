@@ -30,11 +30,44 @@ where
     Ok(())
 }
 
+fn test_err<ExpectedErr, Input>(expected: ExpectedErr, input: Input) -> io::Result<()>
+where
+    ExpectedErr: AsRef<str> + Debug,
+    Input: Serialize,
+    String: PartialEq<ExpectedErr>,
+{
+    let result = to_string(&input);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert_eq!(err.to_string(), expected);
+    Ok(())
+}
+
 #[test]
 fn test_works() -> io::Result<()> {
     let expected = r#"{"a":1,"b":[],"c":2}"#;
     let input = &from_str::<Value>(r#"{"c": 2, "a": 1, "b": []}"#)?;
     test_ok(expected, input)
+}
+
+#[test]
+fn test_null() -> io::Result<()> {
+    let expected = "null";
+    let input_json = json!(None::<()>);
+    let input_rs = None::<()>;
+    test_ok(expected, input_json)?;
+    test_ok(expected, input_rs)?;
+    Ok(())
+}
+
+#[test]
+fn test_encode_special_utf_ascii() -> io::Result<()> {
+    let expected = r#""\n""#;
+    let input_json = json!("\u{000a}");
+    let input_rs = "\u{000a}";
+    test_ok(expected, input_json)?;
+    test_ok(expected, input_rs)?;
+    Ok(())
 }
 
 #[test]
@@ -90,6 +123,37 @@ fn test_none_values_in_array() -> io::Result<()> {
     let input_rs: Vec<Option<&str>> = vec![None, Some("hello")];
     test_ok(expected, input_json)?;
     test_ok(expected, input_rs)?;
+    Ok(())
+}
+
+#[test]
+fn test_array_with_large_integer_values() -> io::Result<()> {
+    // test numbers are
+    //   larger than JavaScript's Number.MAX_SAFE_INTEGER
+    //   and less than i64::MAX
+    macro_rules! create_input_rs {
+        () => {
+            vec![
+                9_100_000_000_000_000,
+                9_000_000_000_000_000,
+                9_200_000_000_000_000,
+            ]
+        };
+    }
+    let input_rs_u64: Vec<u64> = create_input_rs!();
+    let input_rs_u128: Vec<u128> = create_input_rs!();
+    let input_rs_i64: Vec<i64> = create_input_rs!();
+    let input_rs_i128: Vec<i128> = create_input_rs!();
+    test_err("u64 must be less than JSON max safe integer", input_rs_u64)?;
+    test_err(
+        "u128 must be less than JSON max safe integer",
+        input_rs_u128,
+    )?;
+    test_err("i64 must be less than JSON max safe integer", input_rs_i64)?;
+    test_err(
+        "i128 must be less than JSON max safe integer",
+        input_rs_i128,
+    )?;
     Ok(())
 }
 
@@ -195,17 +259,39 @@ fn test_mixed_object_with_more_than_one_property() -> io::Result<()> {
 }
 
 #[test]
-fn test_null() -> io::Result<()> {
-    let expected = "null";
-    let input_json = json!(None::<()>);
-    let input_rs = None::<()>;
-    test_ok(expected, input_json)?;
-    test_ok(expected, input_rs)?;
+fn test_object_with_none_keys() -> io::Result<()> {
+    let expected_err = "key must be a string";
+    let input_rs = treemap![
+        None => "None",
+        Some("Some") => "Some"
+    ];
+    test_err(expected_err, input_rs)?;
     Ok(())
 }
 
 #[test]
-fn test_object_with_number_keys() -> io::Result<()> {
+fn test_object_with_bool_keys() -> io::Result<()> {
+    let expected_err = "key must be a string";
+    let input_rs = treemap![
+        true => "True",
+        false => "False"
+    ];
+    test_err(expected_err, input_rs)?;
+    Ok(())
+}
+
+#[test]
+fn test_object_with_valid_integer_keys() -> io::Result<()> {
+    macro_rules! create_input_rs {
+        () => {
+            treemap![
+                2 => "Two",
+                4 => "Four",
+                1 => "One",
+                3 => "Three"
+            ]
+        };
+    }
     let expected = r#"{"1":"One","2":"Two","3":"Three","4":"Four"}"#;
     let input_json = json!({
         "2": "Two",
@@ -213,29 +299,97 @@ fn test_object_with_number_keys() -> io::Result<()> {
         "1": "One",
         "3": "Three"
     });
+    let input_rs_u8: BTreeMap<u8, &str> = create_input_rs!();
+    let input_rs_u16: BTreeMap<u16, &str> = create_input_rs!();
+    let input_rs_u32: BTreeMap<u32, &str> = create_input_rs!();
+    let input_rs_u64: BTreeMap<u64, &str> = create_input_rs!();
+    let input_rs_u128: BTreeMap<u128, &str> = create_input_rs!();
+    let input_rs_i8: BTreeMap<i8, &str> = create_input_rs!();
+    let input_rs_i16: BTreeMap<i16, &str> = create_input_rs!();
+    let input_rs_i32: BTreeMap<i32, &str> = create_input_rs!();
+    let input_rs_i64: BTreeMap<i64, &str> = create_input_rs!();
+    let input_rs_i128: BTreeMap<i128, &str> = create_input_rs!();
+    test_ok(expected, input_json)?;
+    test_ok(expected, input_rs_u8)?;
+    test_ok(expected, input_rs_u16)?;
+    test_ok(expected, input_rs_u32)?;
+    test_ok(expected, input_rs_u64)?;
+    test_ok(expected, input_rs_u128)?;
+    test_ok(expected, input_rs_i8)?;
+    test_ok(expected, input_rs_i16)?;
+    test_ok(expected, input_rs_i32)?;
+    test_ok(expected, input_rs_i64)?;
+    test_ok(expected, input_rs_i128)?;
+    Ok(())
+}
+
+#[test]
+fn test_object_with_large_integer_keys() -> io::Result<()> {
+    // test numbers are
+    //   larger than JavaScript's Number.MAX_SAFE_INTEGER
+    //   and less than i64::MAX
+    macro_rules! create_input_rs {
+        () => {
+            treemap![
+                9_100_000_000_000_000 => "OKAYY",
+                9_000_000_000_000_000 => "WOWZA",
+                9_200_000_000_000_000 => "YIPES"
+            ]
+        };
+    }
+    let expected =
+        r#"{"9000000000000000":"WOWZA","9100000000000000":"OKAYY","9200000000000000":"YIPES"}"#;
+    let input_json = json!({
+        "9100000000000000": "OKAYY",
+        "9000000000000000": "WOWZA",
+        "9200000000000000": "YIPES"
+    });
+    let input_rs_u64: BTreeMap<u64, &str> = create_input_rs!();
+    let input_rs_u128: BTreeMap<u128, &str> = create_input_rs!();
+    let input_rs_i64: BTreeMap<i64, &str> = create_input_rs!();
+    let input_rs_i128: BTreeMap<i128, &str> = create_input_rs!();
+    test_ok(expected, input_json)?;
+    test_ok(expected, input_rs_u64)?;
+    test_ok(expected, input_rs_u128)?;
+    test_ok(expected, input_rs_i64)?;
+    test_ok(expected, input_rs_i128)?;
+    Ok(())
+}
+
+#[test]
+fn test_object_with_unit_variant_keys() -> io::Result<()> {
+    let expected = r#"{"One":"One","Three":"Three","Two":"Two"}"#;
+    #[derive(PartialEq, Eq, PartialOrd, Ord, serde_derive::Serialize)]
+    enum Key {
+        One,
+        Two,
+        Three,
+    }
     let input_rs = treemap![
-        2 => "Two",
-        4 => "Four",
-        1 => "One",
-        3 => "Three"
+        Key::One => "One",
+        Key::Two => "Two",
+        Key::Three => "Three"
     ];
-    test_ok(expected, input_json)?;
     test_ok(expected, input_rs)?;
     Ok(())
 }
 
 #[test]
-fn test_encode_newline_utf() -> io::Result<()> {
-    let expected = r#""\n""#;
-    let input_json = json!("\u{000a}");
-    let input_rs = "\u{000a}";
-    test_ok(expected, input_json)?;
+fn test_object_with_newtype_keys() -> io::Result<()> {
+    let expected = r#"{"One":"One","Three":"Three","Two":"Two"}"#;
+    #[derive(PartialEq, Eq, PartialOrd, Ord, serde_derive::Serialize)]
+    struct Key<'a>(&'a str);
+    let input_rs = treemap![
+        Key("One") => "One",
+        Key("Two") => "Two",
+        Key("Three") => "Three"
+    ];
     test_ok(expected, input_rs)?;
     Ok(())
 }
 
 #[test]
-fn test_sorting_utf() -> io::Result<()> {
+fn test_object_with_utf_keys() -> io::Result<()> {
     let expected = r#"{"\n":"Newline","1":"One"}"#;
     let input_json = json!({
         "1": "One",
@@ -279,7 +433,7 @@ fn test_object_with_wacky_keys() -> io::Result<()> {
 }
 
 #[test]
-fn test_utf8_sort_bug() -> io::Result<()> {
+fn test_bug_utf8_sort() -> io::Result<()> {
     let input = r###"{"�\u0017B��":null,"�\u0017\\�4�":null}"###;
     let input_val: Value = from_str(input)?;
     let expected = input.to_string();

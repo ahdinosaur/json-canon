@@ -66,6 +66,11 @@ where
     ))
 }
 
+static MAX_SAFE_INTEGER_U64: u64 = 9_007_199_254_740_991;
+static MAX_SAFE_INTEGER_I64: i64 = 9_007_199_254_740_991;
+static MAX_SAFE_INTEGER_U128: u128 = 9_007_199_254_740_991;
+static MAX_SAFE_INTEGER_I128: i128 = 9_007_199_254_740_991;
+
 #[derive(Clone, Debug)]
 #[repr(transparent)]
 pub struct CanonicalFormatter {
@@ -165,7 +170,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        todo!("Handle number str (u128/i128)")
+        todo!("Handle arbitrary precision number_str")
     }
 
     // https://262.ecma-international.org/10.0/#sec-quotejsonstring
@@ -220,7 +225,37 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_i64(&mut self.stack.scope_with_key(writer)?, value)
+        if self.stack.is_in_key()? {
+            CompactFormatter.write_i64(&mut self.stack.scope_with_key(writer)?, value)
+        } else {
+            if value > MAX_SAFE_INTEGER_I64 {
+                Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "i64 must be less than JSON max safe integer",
+                ))
+            } else {
+                CompactFormatter.write_i64(&mut self.stack.scope(writer)?, value)
+            }
+        }
+    }
+
+    #[inline]
+    fn write_i128<W>(&mut self, writer: &mut W, value: i128) -> io::Result<()>
+    where
+        W: Write + ?Sized,
+    {
+        if self.stack.is_in_key()? {
+            CompactFormatter.write_i128(&mut self.stack.scope_with_key(writer)?, value)
+        } else {
+            if value > MAX_SAFE_INTEGER_I128 {
+                Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "i128 must be less than JSON max safe integer",
+                ))
+            } else {
+                CompactFormatter.write_i128(&mut self.stack.scope(writer)?, value)
+            }
+        }
     }
 
     #[inline]
@@ -252,7 +287,37 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_u64(&mut self.stack.scope_with_key(writer)?, value)
+        if self.stack.is_in_key()? {
+            CompactFormatter.write_u64(&mut self.stack.scope_with_key(writer)?, value)
+        } else {
+            if value > MAX_SAFE_INTEGER_U64 {
+                Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "u64 must be less than JSON max safe integer",
+                ))
+            } else {
+                CompactFormatter.write_u64(&mut self.stack.scope(writer)?, value)
+            }
+        }
+    }
+
+    #[inline]
+    fn write_u128<W>(&mut self, writer: &mut W, value: u128) -> io::Result<()>
+    where
+        W: Write + ?Sized,
+    {
+        if self.stack.is_in_key()? {
+            CompactFormatter.write_u128(&mut self.stack.scope_with_key(writer)?, value)
+        } else {
+            if value > MAX_SAFE_INTEGER_U128 {
+                Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "u128 must be less than JSON max safe integer",
+                ))
+            } else {
+                CompactFormatter.write_u128(&mut self.stack.scope(writer)?, value)
+            }
+        }
     }
 
     #[inline]
@@ -383,9 +448,9 @@ where
     F: ryu_js::Float,
 {
     match category {
-        FpCategory::Nan => Err(Error::new(ErrorKind::InvalidInput, "NaN is not allowed.")),
+        FpCategory::Nan => Err(Error::new(ErrorKind::InvalidData, "NaN is not allowed.")),
         FpCategory::Infinite => Err(Error::new(
-            ErrorKind::InvalidInput,
+            ErrorKind::InvalidData,
             "Infinity is not allowed.",
         )),
         FpCategory::Zero => writer.write_all(b"0"),

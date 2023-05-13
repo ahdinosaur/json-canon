@@ -29,6 +29,10 @@ impl ObjectEntry {
         self.is_key_done = true;
     }
 
+    pub(crate) fn is_in_key(&mut self) -> bool {
+        !self.is_key_done
+    }
+
     #[inline]
     pub(crate) fn cmpable<'a>(&'a self) -> impl Iterator<Item = impl Ord + 'a> {
         let key_orig = unsafe { from_utf8_unchecked(self.key_bytes.as_slice()) };
@@ -37,7 +41,7 @@ impl ObjectEntry {
 
     #[inline]
     pub(crate) fn scope<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
-        if !self.is_key_done {
+        if self.is_in_key() {
             Ok(&mut self.key)
         } else {
             Ok(&mut self.value)
@@ -46,7 +50,7 @@ impl ObjectEntry {
 
     #[inline]
     pub(crate) fn scope_with_key<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
-        let writer = if !self.is_key_done {
+        let writer = if self.is_in_key() {
             EitherWriter::Left(BothWriter::new(&mut self.key, &mut self.key_bytes))
         } else {
             EitherWriter::Right(&mut self.value)
@@ -56,7 +60,7 @@ impl ObjectEntry {
 
     #[inline]
     pub(crate) fn key_bytes<'a>(&'a mut self) -> io::Result<impl Write + 'a> {
-        let writer = if !self.is_key_done {
+        let writer = if self.is_in_key() {
             EitherWriter::Left(&mut self.key_bytes)
         } else {
             EitherWriter::Right(sink())
@@ -110,6 +114,11 @@ impl Object {
     #[inline]
     pub(crate) fn end_key(&mut self) -> io::Result<()> {
         Ok(self.current_entry()?.end_key())
+    }
+
+    #[inline]
+    pub(crate) fn is_in_key(&mut self) -> io::Result<bool> {
+        Ok(self.current_entry()?.is_in_key())
     }
 
     #[inline]
@@ -210,6 +219,15 @@ impl ObjectStack {
     #[inline]
     pub(crate) fn end_key(&mut self) -> io::Result<()> {
         Ok(self.current_object()?.end_key()?)
+    }
+
+    #[inline]
+    pub(crate) fn is_in_key(&mut self) -> io::Result<bool> {
+        if self.has_current_object() {
+            Ok(self.current_object()?.is_in_key()?)
+        } else {
+            Ok(false)
+        }
     }
 
     pub(crate) fn scope<'a, W>(&'a mut self, writer: &'a mut W) -> io::Result<impl Write + 'a>
