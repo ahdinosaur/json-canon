@@ -114,39 +114,39 @@ impl Formatter for CanonicalFormatter {
 
         match escape {
             CharEscape::Backspace => {
-                self.stack.write_key_orig(&[0x08])?;
+                self.stack.key_bytes()?.write_all(&[0x08])?;
                 self.stack.scope(writer)?.write_all(b"\\b")?;
             }
             CharEscape::Tab => {
-                self.stack.write_key_orig(&[0x09])?;
+                self.stack.key_bytes()?.write_all(&[0x09])?;
                 self.stack.scope(writer)?.write_all(b"\\t")?;
             }
             CharEscape::LineFeed => {
-                self.stack.write_key_orig(&[0x0A])?;
+                self.stack.key_bytes()?.write_all(&[0x0A])?;
                 self.stack.scope(writer)?.write_all(b"\\n")?;
             }
             CharEscape::FormFeed => {
-                self.stack.write_key_orig(&[0x0C])?;
+                self.stack.key_bytes()?.write_all(&[0x0C])?;
                 self.stack.scope(writer)?.write_all(b"\\f")?;
             }
             CharEscape::CarriageReturn => {
-                self.stack.write_key_orig(&[0x0D])?;
+                self.stack.key_bytes()?.write_all(&[0x0D])?;
                 self.stack.scope(writer)?.write_all(b"\\r")?;
             }
             CharEscape::Quote => {
-                self.stack.write_key_orig(&[0x22])?;
+                self.stack.key_bytes()?.write_all(&[0x22])?;
                 self.stack.scope(writer)?.write_all(b"\\\"")?;
             }
             CharEscape::Solidus => {
-                self.stack.write_key_orig(&[0x2F])?;
+                self.stack.key_bytes()?.write_all(&[0x2F])?;
                 self.stack.scope(writer)?.write_all(b"\\/")?;
             }
             CharEscape::ReverseSolidus => {
-                self.stack.write_key_orig(&[0x5C])?;
+                self.stack.key_bytes()?.write_all(&[0x5C])?;
                 self.stack.scope(writer)?.write_all(b"\\\\")?;
             }
             CharEscape::AsciiControl(control) => {
-                self.stack.write_key_orig(&[control])?;
+                self.stack.key_bytes()?.write_all(&[control])?;
                 self.stack.scope(writer)?.write_all(&[
                     b'\\',
                     b'u',
@@ -175,8 +175,7 @@ impl Formatter for CanonicalFormatter {
         W: Write + ?Sized,
     {
         let bytes = fragment.as_bytes();
-        self.stack.write_key_orig(bytes)?;
-        let mut writer = self.stack.scope(writer)?;
+        let mut writer = self.stack.scope_with_key(writer)?;
         writer.write_all(bytes)?;
         Ok(())
     }
@@ -187,7 +186,7 @@ impl Formatter for CanonicalFormatter {
         W: Write + ?Sized,
     {
         let bytes = fragment.as_bytes();
-        let mut writer = self.stack.scope(writer)?;
+        let mut writer = self.stack.scope_with_key(writer)?;
         writer.write_all(bytes)?;
         Ok(())
     }
@@ -197,7 +196,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_i8(&mut self.stack.scope(writer)?, value)
+        CompactFormatter.write_i8(&mut self.stack.scope_with_key(writer)?, value)
     }
 
     #[inline]
@@ -205,7 +204,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_i16(&mut self.stack.scope(writer)?, value)
+        CompactFormatter.write_i16(&mut self.stack.scope_with_key(writer)?, value)
     }
 
     #[inline]
@@ -213,7 +212,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_i32(&mut self.stack.scope(writer)?, value)
+        CompactFormatter.write_i32(&mut self.stack.scope_with_key(writer)?, value)
     }
 
     #[inline]
@@ -221,7 +220,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_i64(&mut self.stack.scope(writer)?, value)
+        CompactFormatter.write_i64(&mut self.stack.scope_with_key(writer)?, value)
     }
 
     #[inline]
@@ -229,7 +228,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_u8(&mut self.stack.scope(writer)?, value)
+        CompactFormatter.write_u8(&mut self.stack.scope_with_key(writer)?, value)
     }
 
     #[inline]
@@ -237,7 +236,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_u16(&mut self.stack.scope(writer)?, value)
+        CompactFormatter.write_u16(&mut self.stack.scope_with_key(writer)?, value)
     }
 
     #[inline]
@@ -245,7 +244,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_u32(&mut self.stack.scope(writer)?, value)
+        CompactFormatter.write_u32(&mut self.stack.scope_with_key(writer)?, value)
     }
 
     #[inline]
@@ -253,7 +252,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        CompactFormatter.write_u64(&mut self.stack.scope(writer)?, value)
+        CompactFormatter.write_u64(&mut self.stack.scope_with_key(writer)?, value)
     }
 
     #[inline]
@@ -261,7 +260,11 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        write_float(&mut self.stack.scope(writer)?, value.classify(), value)
+        write_float(
+            &mut self.stack.scope_with_key(writer)?,
+            value.classify(),
+            value,
+        )
     }
 
     #[inline]
@@ -269,7 +272,11 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        write_float(&mut self.stack.scope(writer)?, value.classify(), value)
+        write_float(
+            &mut self.stack.scope_with_key(writer)?,
+            value.classify(),
+            value,
+        )
     }
 
     #[inline]

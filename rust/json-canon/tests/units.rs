@@ -1,7 +1,22 @@
-use std::error::Error;
+use std::{collections::BTreeMap, error::Error};
 
 use json_canon::to_string;
 use serde_json::{from_str, json, Value};
+
+macro_rules! treemap {
+    () => {
+        BTreeMap::new()
+    };
+    ($($k:expr => $v:expr),+) => {
+        {
+            let mut m = BTreeMap::new();
+            $(
+                m.insert($k, $v);
+            )+
+            m
+        }
+    };
+}
 
 #[test]
 fn test_works() -> Result<(), Box<dyn Error>> {
@@ -143,6 +158,20 @@ fn test_sorting_utf() -> Result<(), Box<dyn Error>> {
         "\u{000a}": "Newline",
     });
     let expected = r#"{"\n":"Newline","1":"One"}"#.to_string();
+    let actual = to_string(&input)?;
+    assert_eq!(actual, expected);
+    Ok(())
+}
+
+#[test]
+fn test_sorting_number_keys() -> Result<(), Box<dyn Error>> {
+    let input = treemap![
+        2 => "Two",
+        4 => "Four",
+        1 => "One",
+        3 => "Three"
+    ];
+    let expected = r#"{"1":"One","2":"Two","3":"Three","4":"Four"}"#.to_string();
     let actual = to_string(&input)?;
     assert_eq!(actual, expected);
     Ok(())
