@@ -1,4 +1,5 @@
 [workspace]
 members = [
-  "rust/json-canon"
+  "rust/json-canon",
+  "wasm/json-canon-wasm"
 ]
