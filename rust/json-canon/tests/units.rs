@@ -265,17 +265,6 @@ fn test_mixed_object_with_more_than_one_property() -> io::Result<()> {
 }
 
 #[test]
-fn test_object_with_none_keys() -> io::Result<()> {
-    let expected_err = "key must be a string";
-    let input_rs = treemap![
-        None => "None",
-        Some("Some") => "Some"
-    ];
-    test_err(expected_err, input_rs)?;
-    Ok(())
-}
-
-#[test]
 fn test_object_with_bool_keys() -> io::Result<()> {
     let expected_err = "key must be a string";
     let input_rs = treemap![
@@ -391,6 +380,70 @@ fn test_object_with_newtype_keys() -> io::Result<()> {
         Key("Three") => "Three"
     ];
     test_ok(expected, input_rs)?;
+    Ok(())
+}
+
+#[test]
+fn test_object_with_char_keys() -> io::Result<()> {
+    let expected = r#"{"1":"One","2":"Two","3":"Three"}"#;
+    let input_rs = treemap![
+        '1' => "One",
+        '3' => "Three",
+        '2' => "Two"
+    ];
+    test_ok(expected, input_rs)?;
+    Ok(())
+}
+
+#[test]
+fn test_object_with_unit_keys() -> io::Result<()> {
+    let expected_err = "key must be a string";
+    let input_rs = treemap![
+        () => "One",
+        () => "Two",
+        () => "Three"
+    ];
+    test_err(expected_err, input_rs)?;
+    Ok(())
+}
+
+#[test]
+fn test_object_with_some_keys() -> io::Result<()> {
+    let expected_err = "key must be a string";
+    let input_rs = treemap![
+        Some("One") => "One",
+        Some("Two") => "Two",
+        Some("Three") => "Three"
+    ];
+    test_err(expected_err, input_rs)?;
+    Ok(())
+}
+
+#[test]
+fn test_object_with_none_keys() -> io::Result<()> {
+    let expected_err = "key must be a string";
+    let input_rs = treemap![
+        None::<&str> => "One",
+        None::<&str> => "Two",
+        None::<&str> => "Three"
+    ];
+    test_err(expected_err, input_rs)?;
+    Ok(())
+}
+
+#[test]
+fn test_object_with_struct_keys() -> io::Result<()> {
+    let expected_err = "key must be a string";
+    #[derive(PartialEq, Eq, PartialOrd, Ord, serde_derive::Serialize)]
+    struct Key<'a> {
+        name: &'a str,
+    }
+    let input_rs = treemap![
+        Key { name: "One" } => "One",
+        Key { name: "Two" } => "Two",
+        Key { name: "Three" } => "Three"
+    ];
+    test_err(expected_err, input_rs)?;
     Ok(())
 }
 
