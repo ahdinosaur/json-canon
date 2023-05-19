@@ -1,6 +1,8 @@
-use std::io::{self, sink, Error, ErrorKind, Write};
+use std::{
+    io::{self, sink, Error, ErrorKind, Write},
+    str::from_utf8_unchecked,
+};
 
-use encode_unicode::{IterExt, Utf16Char};
 use serde_json::ser::{CompactFormatter, Formatter};
 
 #[derive(Clone, Debug)]
@@ -34,12 +36,8 @@ impl ObjectEntry {
 
     #[inline]
     pub(crate) fn cmpable(&self) -> impl Iterator<Item = impl Ord + '_> {
-        self.key_bytes
-            .iter()
-            .to_utf8chars()
-            .map(|c| c.unwrap())
-            .map(Into::<Utf16Char>::into)
-            .to_units()
+        let key_orig = unsafe { from_utf8_unchecked(self.key_bytes.as_slice()) };
+        key_orig.encode_utf16()
     }
 
     #[inline]
