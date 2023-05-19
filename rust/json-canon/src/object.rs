@@ -1,5 +1,4 @@
 use std::{
-    collections::VecDeque,
     io::{self, sink, Error, ErrorKind, Write},
     str::from_utf8_unchecked,
 };
@@ -167,18 +166,18 @@ impl Object {
 
 #[derive(Clone, Debug)]
 pub(crate) struct ObjectStack {
-    objects: VecDeque<Object>,
+    objects: Vec<Object>,
 }
 
 impl ObjectStack {
     pub(crate) fn new() -> Self {
         Self {
-            objects: VecDeque::new(),
+            objects: Vec::new(),
         }
     }
 
     pub(crate) fn current_object(&mut self) -> io::Result<&mut Object> {
-        self.objects.front_mut().ok_or_else(|| {
+        self.objects.last_mut().ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidData,
                 "Object requested when object is not active.",
@@ -192,7 +191,7 @@ impl ObjectStack {
 
     #[inline]
     pub(crate) fn start_object(&mut self) {
-        self.objects.push_front(Object::new())
+        self.objects.push(Object::new())
     }
 
     #[inline]
@@ -200,7 +199,7 @@ impl ObjectStack {
     where
         W: Write + ?Sized,
     {
-        let mut object = self.objects.pop_front().ok_or_else(|| {
+        let mut object = self.objects.pop().ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidData,
                 "Object requested when object is not active.",
