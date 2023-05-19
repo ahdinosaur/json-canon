@@ -58,7 +58,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: '--all -- --check'
+          args: --all -- --check
 
   clippy:
     runs-on: ubuntu-latest
@@ -70,7 +70,7 @@ jobs:
           profile: minimal
           toolchain: stable
           components: clippy
-      - uses: actions-rs/clippy-check@v1
+      - uses: actions-rs/cargo@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: '--all-features'
+          command: clippy
+          args: -- -D warnings
