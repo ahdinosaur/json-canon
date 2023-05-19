@@ -147,7 +147,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        if !self.stack.is_in_key() && value.abs() > MAX_SAFE_INTEGER_I64 {
+        if !self.stack.is_in_key()? && value.abs() > MAX_SAFE_INTEGER_I64 {
             Err(Error::new(
                 ErrorKind::InvalidData,
                 "i64.abs() must be less than JSON max safe integer",
@@ -165,7 +165,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        if !self.stack.is_in_key() && value.abs() > MAX_SAFE_INTEGER_I128 {
+        if !self.stack.is_in_key()? && value.abs() > MAX_SAFE_INTEGER_I128 {
             Err(Error::new(
                 ErrorKind::InvalidData,
                 "i128.abs() must be less than JSON max safe integer",
@@ -210,7 +210,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        if !self.stack.is_in_key() && value > MAX_SAFE_INTEGER_U64 {
+        if !self.stack.is_in_key()? && value > MAX_SAFE_INTEGER_U64 {
             Err(Error::new(
                 ErrorKind::InvalidData,
                 "u64 must be less than JSON max safe integer",
@@ -228,7 +228,7 @@ impl Formatter for CanonicalFormatter {
     where
         W: Write + ?Sized,
     {
-        if !self.stack.is_in_key() && value > MAX_SAFE_INTEGER_U128 {
+        if !self.stack.is_in_key()? && value > MAX_SAFE_INTEGER_U128 {
             Err(Error::new(
                 ErrorKind::InvalidData,
                 "u128 must be less than JSON max safe integer",

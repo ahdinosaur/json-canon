@@ -11,6 +11,7 @@ pub(crate) struct ObjectEntry {
     key: Vec<u8>,
     key_bytes: Vec<u8>,
     value: Vec<u8>,
+    is_key_done: bool,
 }
 
 impl ObjectEntry {
@@ -20,7 +21,18 @@ impl ObjectEntry {
             key: Vec::new(),
             key_bytes: Vec::new(),
             value: Vec::new(),
+            is_key_done: false,
         }
+    }
+
+    #[inline]
+    pub(crate) fn end_key(&mut self) {
+        self.is_key_done = true;
+    }
+
+    #[inline]
+    pub(crate) fn is_in_key(&mut self) -> bool {
+        !self.is_key_done
     }
 
     #[inline]
@@ -30,8 +42,8 @@ impl ObjectEntry {
     }
 
     #[inline]
-    pub(crate) fn scope(&mut self, is_in_key: bool) -> io::Result<impl Write + '_> {
-        if is_in_key {
+    pub(crate) fn scope(&mut self) -> io::Result<impl Write + '_> {
+        if self.is_in_key() {
             Ok(&mut self.key)
         } else {
             Ok(&mut self.value)
@@ -39,8 +51,8 @@ impl ObjectEntry {
     }
 
     #[inline]
-    pub(crate) fn scope_with_key(&mut self, is_in_key: bool) -> io::Result<impl Write + '_> {
-        let writer = if is_in_key {
+    pub(crate) fn scope_with_key(&mut self) -> io::Result<impl Write + '_> {
+        let writer = if self.is_in_key() {
             EitherWriter::Left(BothWriter::new(&mut self.key, &mut self.key_bytes))
         } else {
             EitherWriter::Right(&mut self.value)
@@ -49,8 +61,8 @@ impl ObjectEntry {
     }
 
     #[inline]
-    pub(crate) fn key_bytes(&mut self, is_in_key: bool) -> io::Result<impl Write + '_> {
-        let writer = if is_in_key {
+    pub(crate) fn key_bytes(&mut self) -> io::Result<impl Write + '_> {
+        let writer = if self.is_in_key() {
             EitherWriter::Left(&mut self.key_bytes)
         } else {
             EitherWriter::Right(sink())
@@ -104,20 +116,32 @@ impl Object {
     }
 
     #[inline]
-    pub(crate) fn scope(&mut self, is_in_key: bool) -> io::Result<impl Write + '_> {
-        let writer = self.current_entry()?.scope(is_in_key)?;
+    pub(crate) fn end_key(&mut self) -> io::Result<()> {
+        self.current_entry()?.end_key();
+        Ok(())
+    }
+
+    #[inline]
+    pub(crate) fn is_in_key(&mut self) -> io::Result<bool> {
+        let is_in_key = self.current_entry()?.is_in_key();
+        Ok(is_in_key)
+    }
+
+    #[inline]
+    pub(crate) fn scope(&mut self) -> io::Result<impl Write + '_> {
+        let writer = self.current_entry()?.scope()?;
         Ok(writer)
     }
 
     #[inline]
-    pub(crate) fn scope_with_key(&mut self, is_in_key: bool) -> io::Result<impl Write + '_> {
-        let writer = self.current_entry()?.scope_with_key(is_in_key)?;
+    pub(crate) fn scope_with_key(&mut self) -> io::Result<impl Write + '_> {
+        let writer = self.current_entry()?.scope_with_key()?;
         Ok(writer)
     }
 
     #[inline]
-    pub(crate) fn key_bytes(&mut self, is_in_key: bool) -> io::Result<impl Write + '_> {
-        let writer = self.current_entry()?.key_bytes(is_in_key)?;
+    pub(crate) fn key_bytes(&mut self) -> io::Result<impl Write + '_> {
+        let writer = self.current_entry()?.key_bytes()?;
         Ok(writer)
     }
 
@@ -148,14 +172,12 @@ impl Object {
 #[derive(Clone, Debug)]
 pub(crate) struct ObjectStack {
     objects: VecDeque<Object>,
-    is_in_key: bool,
 }
 
 impl ObjectStack {
     pub(crate) fn new() -> Self {
         Self {
             objects: VecDeque::new(),
-            is_in_key: false,
         }
     }
 
@@ -191,9 +213,8 @@ impl ObjectStack {
             )
         })?;
 
-        let is_in_key = self.is_in_key();
         if self.has_current_object() {
-            let mut writer = self.current_object()?.scope(is_in_key)?;
+            let mut writer = self.current_object()?.scope()?;
             object.write_to(&mut writer)?;
         } else {
             object.write_to(writer)?;
@@ -203,29 +224,32 @@ impl ObjectStack {
 
     #[inline]
     pub(crate) fn start_key(&mut self) -> io::Result<()> {
-        self.is_in_key = true;
         self.current_object()?.start_key();
         Ok(())
     }
 
     #[inline]
     pub(crate) fn end_key(&mut self) -> io::Result<()> {
-        self.is_in_key = false;
+        self.current_object()?.end_key()?;
         Ok(())
     }
 
     #[inline]
-    pub(crate) fn is_in_key(&self) -> bool {
-        self.is_in_key
+    pub(crate) fn is_in_key(&mut self) -> io::Result<bool> {
+        let is_in_key = if self.has_current_object() {
+            self.current_object()?.is_in_key()?
+        } else {
+            false
+        };
+        Ok(is_in_key)
     }
 
     pub(crate) fn scope<'a, W>(&'a mut self, writer: &'a mut W) -> io::Result<impl Write + 'a>
     where
         W: Write + ?Sized,
     {
-        let is_in_key = self.is_in_key();
         let writer: EitherWriter<_, _> = if self.has_current_object() {
-            let object_writer = self.current_object()?.scope(is_in_key)?;
+            let object_writer = self.current_object()?.scope()?;
             EitherWriter::Left(object_writer)
         } else {
             EitherWriter::Right(writer)
@@ -241,9 +265,8 @@ impl ObjectStack {
     where
         W: Write + ?Sized,
     {
-        let is_in_key = self.is_in_key();
         let writer: EitherWriter<_, _> = if self.has_current_object() {
-            let object_writer = self.current_object()?.scope_with_key(is_in_key)?;
+            let object_writer = self.current_object()?.scope_with_key()?;
             EitherWriter::Left(object_writer)
         } else {
             EitherWriter::Right(writer)
@@ -253,9 +276,8 @@ impl ObjectStack {
 
     #[inline]
     pub(crate) fn key_bytes(&mut self) -> io::Result<impl Write + '_> {
-        let is_in_key = self.is_in_key();
         let writer: EitherWriter<_, _> = if self.has_current_object() {
-            let key_bytes_writer = self.current_object()?.key_bytes(is_in_key)?;
+            let key_bytes_writer = self.current_object()?.key_bytes()?;
             EitherWriter::Left(key_bytes_writer)
         } else {
             EitherWriter::Right(sink())
