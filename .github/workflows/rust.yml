@@ -12,6 +12,7 @@ env:
 jobs:
   check:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -21,25 +22,31 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     strategy:
       matrix:
         toolchain:
           - stable
           - 1.56.1
+
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: ${{ matrix.toolchain }}
+      - uses: actions/setup-node@v3
       - uses: actions-rs/cargo@v1
         with:
           command: test
+
   lint:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -51,8 +58,10 @@ jobs:
         with:
           command: fmt
           args: '--all -- --check'
+
   clippy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
