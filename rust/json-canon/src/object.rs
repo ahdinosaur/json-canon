@@ -175,6 +175,7 @@ pub(crate) struct ObjectStack {
 }
 
 impl ObjectStack {
+    #[inline]
     pub(crate) fn new() -> Self {
         Self {
             objects: VecDeque::new(),
@@ -244,6 +245,7 @@ impl ObjectStack {
         Ok(is_in_key)
     }
 
+    #[inline]
     pub(crate) fn scope<'a, W>(&'a mut self, writer: &'a mut W) -> io::Result<impl Write + 'a>
     where
         W: Write + ?Sized,
