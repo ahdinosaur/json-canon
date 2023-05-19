@@ -20,7 +20,7 @@ The JSON Canonicalization Scheme concept in a nutshell:
 
 ### JavaScript: [`json-canon`](./js/json-canon)
 
-[![npm version](https://img.shields.io/npm/v/json-canon.svg?style=flat-square)](https://www.npmjs.com/package/json-canon) [![download](https://img.shields.io/npm/dt/json-canon?style=flat-square)](https://www.npmjs.com/package/json-canon)
+[![npm version](https://img.shields.io/npm/v/json-canon.svg?style=flat-square)](https://www.npmjs.com/package/json-canon) [![download](https://img.shields.io/npm/dt/json-canon?style=flat-square)](https://www.npmjs.com/package/json-canon) [![ci status](https://img.shields.io/github/actions/workflow/status/ahdinosaur/json-canon/js.yml?branch=main&style=flat-square)](https://github.com/ahdinosaur/json-canon/actions/workflows/js.yml)
 
 ```js
 const serialize = require('json-canon')
@@ -38,7 +38,7 @@ console.log(serialize(json))
 
 ### Rust: [`json-canon`](./rust/json-canon)
 
-[![crates.io version](https://img.shields.io/crates/v/json-canon.svg?style=flat-square)](https://crates.io/crates/json-canon) [![download](https://img.shields.io/crates/d/json-canon.svg?style=flat-square)](https://crates.io/crates/json-canon) [![docs.rs docs](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://docs.rs/json-canon)
+[![crates.io version](https://img.shields.io/crates/v/json-canon.svg?style=flat-square)](https://crates.io/crates/json-canon) [![download](https://img.shields.io/crates/d/json-canon.svg?style=flat-square)](https://crates.io/crates/json-canon) [![docs.rs docs](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://docs.rs/json-canon) [![ci status](https://img.shields.io/github/actions/workflow/status/ahdinosaur/json-canon/rust.yml?branch=main&style=flat-square)](https://github.com/ahdinosaur/json-canon/actions/workflows/rust.yml)
 
 ```rust
 use json_canon::to_string;
