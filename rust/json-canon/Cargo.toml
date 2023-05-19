@@ -3,6 +3,7 @@ name = "json-canon"
 version = "0.1.3"
 authors = ["Michael Williams <hello@mikey.nz>"]
 edition = "2021"
+rust-version = "1.56.1"
 license = "Apache-2.0"
 description = "Serialize JSON into a canonical format."
 repository = "https://github.com/ahdinosaur/json-canon"
