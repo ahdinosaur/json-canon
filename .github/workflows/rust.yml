@@ -40,6 +40,7 @@ jobs:
           profile: minimal
           toolchain: ${{ matrix.toolchain }}
       - uses: actions/setup-node@v3
+      - run: npm ci
       - uses: actions-rs/cargo@v1
         with:
           command: test
