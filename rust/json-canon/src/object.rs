@@ -15,6 +15,7 @@ pub(crate) struct ObjectEntry {
 }
 
 impl ObjectEntry {
+    #[inline]
     pub(crate) fn new() -> Self {
         Self {
             key: Vec::new(),
@@ -29,6 +30,7 @@ impl ObjectEntry {
         self.is_key_done = true;
     }
 
+    #[inline]
     pub(crate) fn is_in_key(&mut self) -> bool {
         !self.is_key_done
     }
@@ -91,12 +93,14 @@ pub(crate) struct Object {
 }
 
 impl Object {
+    #[inline]
     pub(crate) fn new() -> Self {
         Self {
             entries: Vec::new(),
         }
     }
 
+    #[inline]
     pub(crate) fn current_entry(&mut self) -> io::Result<&mut ObjectEntry> {
         self.entries.last_mut().ok_or_else(|| {
             Error::new(
@@ -177,6 +181,7 @@ impl ObjectStack {
         }
     }
 
+    #[inline]
     pub(crate) fn current_object(&mut self) -> io::Result<&mut Object> {
         self.objects.front_mut().ok_or_else(|| {
             Error::new(
@@ -186,6 +191,7 @@ impl ObjectStack {
         })
     }
 
+    #[inline]
     pub(crate) fn has_current_object(&mut self) -> bool {
         !self.objects.is_empty()
     }
@@ -251,6 +257,7 @@ impl ObjectStack {
         Ok(writer)
     }
 
+    #[inline]
     pub(crate) fn scope_with_key<'a, W>(
         &'a mut self,
         writer: &'a mut W,
@@ -267,6 +274,7 @@ impl ObjectStack {
         Ok(writer)
     }
 
+    #[inline]
     pub(crate) fn key_bytes(&mut self) -> io::Result<impl Write + '_> {
         let writer: EitherWriter<_, _> = if self.has_current_object() {
             let key_bytes_writer = self.current_object()?.key_bytes()?;
@@ -288,6 +296,7 @@ where
     LeftWriter: Write,
     RightWriter: Write,
 {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self {
             EitherWriter::Left(writer) => writer.write(buf),
@@ -295,6 +304,7 @@ where
         }
     }
 
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         match self {
             EitherWriter::Left(writer) => writer.flush(),
@@ -309,6 +319,7 @@ struct BothWriter<LeftWriter, RightWriter> {
 }
 
 impl<LeftWriter, RightWriter> BothWriter<LeftWriter, RightWriter> {
+    #[inline]
     fn new(left: LeftWriter, right: RightWriter) -> Self {
         Self { left, right }
     }
@@ -319,6 +330,7 @@ where
     LeftWriter: Write,
     RightWriter: Write,
 {
+    #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.left.write_all(buf)?;
         self.right.write_all(buf)?;
@@ -326,6 +338,7 @@ where
         Ok(buf.len())
     }
 
+    #[inline]
     fn flush(&mut self) -> io::Result<()> {
         self.left.flush()?;
         self.right.flush()?;

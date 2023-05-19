@@ -478,6 +478,7 @@ impl Formatter for CanonicalFormatter {
     }
 }
 
+#[inline]
 fn write_float<W, F>(writer: &mut W, category: FpCategory, value: F) -> io::Result<()>
 where
     W: Write + ?Sized,
