@@ -35,6 +35,7 @@
 //!
 
 mod object;
+mod pool;
 mod ser;
 
 pub use self::ser::{to_string, to_vec, to_writer};

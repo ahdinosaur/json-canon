@@ -1,9 +1,17 @@
 use std::{
     io::{self, sink, Error, ErrorKind, Write},
     str::from_utf8_unchecked,
+    sync::Arc,
 };
 
+use lazy_static::lazy_static;
 use serde_json::ser::{CompactFormatter, Formatter};
+
+use crate::pool::{Clear, Pool, PoolObjectContainer};
+
+lazy_static! {
+    static ref POOL: Arc<Pool<ObjectEntry>> = Arc::new(Pool::with_capacity(256));
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct ObjectEntry {
@@ -13,14 +21,29 @@ pub(crate) struct ObjectEntry {
     is_key_done: bool,
 }
 
-impl ObjectEntry {
-    pub(crate) fn new() -> Self {
+impl Clear for ObjectEntry {
+    fn clear(&mut self) {
+        self.key.clear();
+        self.key_bytes.clear();
+        self.value.clear();
+        self.is_key_done = false;
+    }
+}
+
+impl Default for ObjectEntry {
+    fn default() -> Self {
         Self {
-            key: Vec::new(),
-            key_bytes: Vec::new(),
-            value: Vec::new(),
+            key: Vec::with_capacity(8),
+            key_bytes: Vec::with_capacity(8),
+            value: Vec::with_capacity(16),
             is_key_done: false,
         }
+    }
+}
+
+impl ObjectEntry {
+    pub(crate) fn new() -> PoolObjectContainer<ObjectEntry> {
+        Pool::create(POOL.clone())
     }
 
     #[inline]
@@ -84,9 +107,9 @@ impl ObjectEntry {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct Object {
-    entries: Vec<ObjectEntry>,
+    entries: Vec<PoolObjectContainer<ObjectEntry>>,
 }
 
 impl Object {
@@ -96,7 +119,7 @@ impl Object {
         }
     }
 
-    pub(crate) fn current_entry(&mut self) -> io::Result<&mut ObjectEntry> {
+    pub(crate) fn current_entry(&mut self) -> io::Result<&mut PoolObjectContainer<ObjectEntry>> {
         self.entries.last_mut().ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidData,
@@ -164,7 +187,7 @@ impl Object {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct ObjectStack {
     objects: Vec<Object>,
 }
