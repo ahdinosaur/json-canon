@@ -148,7 +148,7 @@ impl Object {
     {
         CompactFormatter.begin_object(writer)?;
 
-        let mut entries = self.entries.clone();
+        let entries = &mut self.entries;
 
         entries.sort_by(|a, b| a.cmpable().cmp(b.cmpable()));
 
