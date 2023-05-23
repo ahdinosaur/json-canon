@@ -23,7 +23,7 @@ where
     T: Clear,
 {
     #[inline]
-    pub fn new(capacity: usize) -> Self {
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
             values: ArrayQueue::new(capacity),
             max_size: capacity,
@@ -55,13 +55,6 @@ where
     }
 }
 
-impl<T: Clear> Default for Pool<T> {
-    #[inline]
-    fn default() -> Self {
-        Self::new(1024)
-    }
-}
-
 #[derive(Debug)]
 pub struct PoolObjectContainer<T: Clear> {
     pool: Arc<Pool<T>>,
@@ -81,12 +74,14 @@ impl<T: Clear> PoolObjectContainer<T> {
 impl<T: Clear> Deref for PoolObjectContainer<T> {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
 }
 
 impl<T: Clear> DerefMut for PoolObjectContainer<T> {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

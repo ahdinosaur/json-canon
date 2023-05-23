@@ -10,7 +10,7 @@ use serde_json::ser::{CompactFormatter, Formatter};
 use crate::pool::{Clear, Pool, PoolObjectContainer};
 
 lazy_static! {
-    static ref POOL: Arc<Pool<ObjectEntry>> = Arc::new(Pool::default());
+    static ref POOL: Arc<Pool<ObjectEntry>> = Arc::new(Pool::with_capacity(256));
 }
 
 #[derive(Clone, Debug)]
@@ -33,9 +33,9 @@ impl Clear for ObjectEntry {
 impl Default for ObjectEntry {
     fn default() -> Self {
         Self {
-            key: Vec::with_capacity(16),
-            key_bytes: Vec::with_capacity(16),
-            value: Vec::with_capacity(64),
+            key: Vec::with_capacity(8),
+            key_bytes: Vec::with_capacity(8),
+            value: Vec::with_capacity(16),
             is_key_done: false,
         }
     }
