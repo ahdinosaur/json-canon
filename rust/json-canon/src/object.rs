@@ -1,21 +1,27 @@
 use std::{
     io::{self, sink, Error, ErrorKind, Write},
-    ops::{Deref, DerefMut},
     str::from_utf8_unchecked,
+    sync::Arc,
 };
 
-use easy_pool::{Clear, EasyPoolArayQueue, PoolObjectContainer};
+use lazy_static::lazy_static;
 use serde_json::ser::{CompactFormatter, Formatter};
 
-#[derive(EasyPoolArayQueue, Clone, Debug)]
-pub(crate) struct ObjectEntryInner {
+use crate::pool::{Clear, Pool, PoolObjectContainer};
+
+lazy_static! {
+    static ref POOL: Arc<Pool<ObjectEntry>> = Arc::new(Pool::default());
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ObjectEntry {
     key: Vec<u8>,
     key_bytes: Vec<u8>,
     value: Vec<u8>,
     is_key_done: bool,
 }
 
-impl Clear for ObjectEntryInner {
+impl Clear for ObjectEntry {
     fn clear(&mut self) {
         self.key.clear();
         self.key_bytes.clear();
@@ -24,41 +30,20 @@ impl Clear for ObjectEntryInner {
     }
 }
 
-impl Default for ObjectEntryInner {
+impl Default for ObjectEntry {
     fn default() -> Self {
         Self {
-            key: Vec::new(),
-            key_bytes: Vec::new(),
-            value: Vec::new(),
+            key: Vec::with_capacity(16),
+            key_bytes: Vec::with_capacity(16),
+            value: Vec::with_capacity(64),
             is_key_done: false,
         }
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct ObjectEntry {
-    inner: PoolObjectContainer<ObjectEntryInner>,
-}
-
-impl Deref for ObjectEntry {
-    type Target = ObjectEntryInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl DerefMut for ObjectEntry {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
-
 impl ObjectEntry {
-    pub(crate) fn new() -> Self {
-        Self {
-            inner: ObjectEntryInner::create(),
-        }
+    pub(crate) fn new() -> PoolObjectContainer<ObjectEntry> {
+        Pool::create(POOL.clone())
     }
 
     #[inline]
@@ -88,8 +73,7 @@ impl ObjectEntry {
     #[inline]
     pub(crate) fn scope_with_key(&mut self) -> io::Result<impl Write + '_> {
         let writer = if self.is_in_key() {
-            EitherWriter::Left(&mut self.key)
-            // EitherWriter::Left(BothWriter::new(&mut self.key, &mut self.key_bytes))
+            EitherWriter::Left(BothWriter::new(&mut self.key, &mut self.key_bytes))
         } else {
             EitherWriter::Right(&mut self.value)
         };
@@ -125,7 +109,7 @@ impl ObjectEntry {
 
 #[derive(Debug)]
 pub(crate) struct Object {
-    entries: Vec<ObjectEntry>,
+    entries: Vec<PoolObjectContainer<ObjectEntry>>,
 }
 
 impl Object {
@@ -135,7 +119,7 @@ impl Object {
         }
     }
 
-    pub(crate) fn current_entry(&mut self) -> io::Result<&mut ObjectEntry> {
+    pub(crate) fn current_entry(&mut self) -> io::Result<&mut PoolObjectContainer<ObjectEntry>> {
         self.entries.last_mut().ok_or_else(|| {
             Error::new(
                 ErrorKind::InvalidData,
