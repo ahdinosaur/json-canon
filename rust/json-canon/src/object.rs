@@ -1,25 +1,63 @@
 use std::{
     io::{self, sink, Error, ErrorKind, Write},
+    ops::{Deref, DerefMut},
     str::from_utf8_unchecked,
 };
 
+use easy_pool::{Clear, EasyPoolArayQueue, PoolObjectContainer};
 use serde_json::ser::{CompactFormatter, Formatter};
 
-#[derive(Clone, Debug)]
-pub(crate) struct ObjectEntry {
+#[derive(EasyPoolArayQueue, Clone, Debug)]
+pub(crate) struct ObjectEntryInner {
     key: Vec<u8>,
     key_bytes: Vec<u8>,
     value: Vec<u8>,
     is_key_done: bool,
 }
 
-impl ObjectEntry {
-    pub(crate) fn new() -> Self {
+impl Clear for ObjectEntryInner {
+    fn clear(&mut self) {
+        self.key.clear();
+        self.key_bytes.clear();
+        self.value.clear();
+        self.is_key_done = false;
+    }
+}
+
+impl Default for ObjectEntryInner {
+    fn default() -> Self {
         Self {
             key: Vec::new(),
             key_bytes: Vec::new(),
             value: Vec::new(),
             is_key_done: false,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ObjectEntry {
+    inner: PoolObjectContainer<ObjectEntryInner>,
+}
+
+impl Deref for ObjectEntry {
+    type Target = ObjectEntryInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for ObjectEntry {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl ObjectEntry {
+    pub(crate) fn new() -> Self {
+        Self {
+            inner: ObjectEntryInner::create(),
         }
     }
 
@@ -50,7 +88,8 @@ impl ObjectEntry {
     #[inline]
     pub(crate) fn scope_with_key(&mut self) -> io::Result<impl Write + '_> {
         let writer = if self.is_in_key() {
-            EitherWriter::Left(BothWriter::new(&mut self.key, &mut self.key_bytes))
+            EitherWriter::Left(&mut self.key)
+            // EitherWriter::Left(BothWriter::new(&mut self.key, &mut self.key_bytes))
         } else {
             EitherWriter::Right(&mut self.value)
         };
@@ -84,7 +123,7 @@ impl ObjectEntry {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct Object {
     entries: Vec<ObjectEntry>,
 }
@@ -164,7 +203,7 @@ impl Object {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct ObjectStack {
     objects: Vec<Object>,
 }

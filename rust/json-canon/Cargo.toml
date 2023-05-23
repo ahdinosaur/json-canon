@@ -14,6 +14,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+easy-pool = "0.2.7"
 ryu-js = { version = "0.2.2", default-features = false }
 serde = { version = "1.0.162", default-features = false }
 serde_json = { version = "1.0.96", default-features = false, features = ["std", "float_roundtrip"] }

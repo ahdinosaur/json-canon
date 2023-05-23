@@ -71,7 +71,7 @@ static MAX_SAFE_INTEGER_I64: i64 = 9_007_199_254_740_991;
 static MAX_SAFE_INTEGER_U128: u128 = 9_007_199_254_740_991;
 static MAX_SAFE_INTEGER_I128: i128 = 9_007_199_254_740_991;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct CanonicalFormatter {
     stack: ObjectStack,
